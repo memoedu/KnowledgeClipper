@@ -187,7 +187,7 @@ public sealed record ChatPreferences(string Provider = "api", string Model = "",
 
 public static class ChatTypeDefaults
 {
-    public const string Model = "gpt-6.1-sol";
+    public const string Model = "gpt-6.2-sol";
     public static void Apply(ChatSession chat)
     {
         // API conversations retain their own model catalog and native binding.

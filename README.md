@@ -8,6 +8,8 @@ Windows 悬浮式知识采集工具：划词朗读、图文提问、多轮问答
 
 ## 当前交付状态
 
+新对话的 Sol 默认使用 `gpt-6.2-sol`；API 模型列表提供 6.2 Sol，保留旧 Sol 选项以兼容已保存的会话。文字和图片调用保留原推理强度、输出结构与导出规则。已有会话和历史请求不会因升级自动重放。
+
 RemNote 独立连接支持 IPv4、IPv6 回环安装入口和 Origin:null 沙箱。随机凭据仅交付给受 RemNote frame-ancestors 限制的 iframe HTML，HTML 不开放 CORS；后台 WebSocket 继续校验凭据和原协议。插件使用 Blob Worker 维持原后台传输。2026-10-24 已核验真实连接与 SDK 响应，桌面包及既有制卡数据沿用原部署。
 
 2026-10-19 核对的现役桌面包为 `D:/Artifacts/KnowledgeClipper/image-link-20261019/release-final/RemNoteQuickClipper.Desktop/Release/net8.0-windows/win-x64`。实际进程、桌面快捷方式和 `Personal Tool - KnowledgeClipper` 计划任务均已指向此包。复制明确的图片链接可显示现有图片浮点，静态 SVG 在本地转换；普通网址与原生剪贴板图片沿用原规则。此前表格、预览定位、整合制卡和 Tab 功能保留。RemNote 专用服务仍使用 `performance-20261016/remnote`，HTTP/WS/安装服务分别为 43111/43112/43113。路径是本机部署事实，其他机器按其安装配置核对。

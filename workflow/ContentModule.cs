@@ -128,8 +128,8 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
                 };
                 if (disableThinking) payload["thinking"] = new { type = "disabled" };
                 request.Content = JsonContent.Create(openai ? OpenAiTransport.Payload(settings.Model, messages,
-                    settings.Model == "gpt-6.1-sol" ? Math.Max(8192, maxTokens) : maxTokens, true, false,
-                    settings.Model == "gpt-6.1-sol" ? "high" : "low") : payload);
+                    settings.Model is "gpt-6.2-sol" or "gpt-6.1-sol" ? Math.Max(8192, maxTokens) : maxTokens, true, false,
+                    settings.Model is "gpt-6.2-sol" or "gpt-6.1-sol" ? "high" : "low") : payload);
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(settings.ContentTimeoutSeconds));
                 using var response = await http.SendAsync(request, timeout.Token);

@@ -38,7 +38,7 @@ internal static partial class Program
             } catch (HttpListenerException) { break; } catch (ObjectDisposedException) { break; } });
         }
         WorkflowJson.Save(Path.Combine(data, "language-settings.json"), settings);
-        WorkflowJson.Save(Path.Combine(data, "chat-preferences.json"), new ChatPreferences("codex", "gpt-6.1-sol", "low", "fast-answer"));
+        WorkflowJson.Save(Path.Combine(data, "chat-preferences.json"), new ChatPreferences("codex", "gpt-6.2-sol", "low", "fast-answer"));
         var configType = desktop.GetType("KnowledgeClipper.AppConfig", true)!;
         var config = configType.GetMethod("Read")!.Invoke(null, [Path.Combine(repo, "appsettings.json")])!;
         configType.GetProperty("WorkDirectory")!.SetValue(config, data);
@@ -114,7 +114,7 @@ internal static partial class Program
             Check(Draft(imageForm).Chat!.Input == "" && Draft(imageForm).Chat!.Attachments.Count == 1, "纯图片也能提交，不注入伪造问题文字"); imageForm.Close();
 
             // Deliberately restore a different manual preference: shortcut defaults must be independent.
-            WorkflowJson.Save(Path.Combine(data, "chat-preferences.json"), new ChatPreferences("codex", "gpt-6.1-sol", "low", "chunk-solution"));
+            WorkflowJson.Save(Path.Combine(data, "chat-preferences.json"), new ChatPreferences("codex", "gpt-6.2-sol", "low", "chunk-solution"));
             var preferences = File.ReadAllText(Path.Combine(data, "chat-preferences.json"));
             await (Task<bool>)Call(flow, "StartQuestionInputAsync", "", new byte[][] { png }, true)!;
             var quickImage = Chats().Last(); await Ready(quickImage); await Turn(quickImage, 0); await Shot(quickImage, "quick-image-answer");
@@ -140,14 +140,14 @@ internal static partial class Program
             await (Task)Call(flow, "StartQuestionAsync", snapshot, false)!;
             var cardEntry = Chats().Last(); await Ready(cardEntry);
             var cardChat = Draft(cardEntry).Chat!;
-            Check(cardChat.Binding.Provider == "codex" && cardChat.TypeId == "chunk-solution" && cardChat.Model == "gpt-6.1-sol" && cardChat.Effort == "high" && cardChat.UseQuestionTypeDefaults && cardChat.Prompts.Count == 0,
-                "真实浮点卡入口自动匹配 Codex 6.1 sol 和 high，仍等待发送");
+            Check(cardChat.Binding.Provider == "codex" && cardChat.TypeId == "chunk-solution" && cardChat.Model == "gpt-6.2-sol" && cardChat.Effort == "high" && cardChat.UseQuestionTypeDefaults && cardChat.Prompts.Count == 0,
+                "真实浮点卡入口自动匹配 Codex 6.2 sol 和 high，仍等待发送");
             async Task SelectType(string typeId)
             {
                 await Js(cardEntry, "(()=>{const s=document.querySelectorAll('.selectors select')[3];s.value="+JsonSerializer.Serialize(typeId)+";s.dispatchEvent(new Event('change',{bubbles:true}));})()");
                 var expected = typeId == "fast-answer" ? "low" : "high";
-                await Wait(cardEntry, "(()=>{const s=document.querySelectorAll('.selectors select');return s[3].value==="+JsonSerializer.Serialize(typeId)+"&&s[1].value==='gpt-6.1-sol'&&s[2].value==="+JsonSerializer.Serialize(expected)+"&&s[1].disabled&&s[2].disabled})()");
-                Check(cardChat.TypeId == typeId && cardChat.Model == "gpt-6.1-sol" && cardChat.Effort == expected, "实际类型选择自动匹配模型与等级："+typeId);
+                await Wait(cardEntry, "(()=>{const s=document.querySelectorAll('.selectors select');return s[3].value==="+JsonSerializer.Serialize(typeId)+"&&s[1].value==='gpt-6.2-sol'&&s[2].value==="+JsonSerializer.Serialize(expected)+"&&s[1].disabled&&s[2].disabled})()");
+                Check(cardChat.TypeId == typeId && cardChat.Model == "gpt-6.2-sol" && cardChat.Effort == expected, "实际类型选择自动匹配模型与等级："+typeId);
             }
             var types = new ChatConfigurationLoader(Path.Combine(repo,"modes","chat"),Path.Combine(data,"modes","chat")).Load().Types;
             foreach(var type in types) await SelectType(type.Id);
@@ -156,21 +156,21 @@ internal static partial class Program
             {
                 await Input(cardEntry,"计算2加3，仅给出结果"); await Button(cardEntry,"发送"); await Turn(cardEntry,0);
                 var nativeId = cardChat.Binding.ThreadId;
-                Check(cardChat.Prompts[0].Model == "gpt-6.1-sol" && cardChat.Prompts[0].Effort == "low" && cardChat.Messages.Last().Text.Contains("5"), "快速回答真实 SDK 回合使用 6.1 sol low 并答对独立公开题");
+                Check(cardChat.Prompts[0].Model == "gpt-6.2-sol" && cardChat.Prompts[0].Effort == "low" && cardChat.Messages.Last().Text.Contains("5"), "快速回答真实 SDK 回合使用 6.2 sol low 并答对独立公开题");
                 await SelectType("chunk-solution"); await Input(cardEntry,"计算6乘7，说明计算过程"); await Button(cardEntry,"发送"); await Turn(cardEntry,1);
-                Check(cardChat.Binding.ThreadId == nativeId && cardChat.Prompts[0].Effort == "low" && cardChat.Prompts[1].Effort == "high" && cardChat.Prompts[1].Model == "gpt-6.1-sol" && cardChat.Messages.Last().Text.Contains("42"), "切换其他类型真实使用 high，复用同一原生 Thread，既有回合快照不变");
+                Check(cardChat.Binding.ThreadId == nativeId && cardChat.Prompts[0].Effort == "low" && cardChat.Prompts[1].Effort == "high" && cardChat.Prompts[1].Model == "gpt-6.2-sol" && cardChat.Messages.Last().Text.Contains("42"), "切换其他类型真实使用 high，复用同一原生 Thread，既有回合快照不变");
                 await Shot(cardEntry,"card-high-answer");
             }
             var cardId=Draft(cardEntry).Id; var beforePrompts=cardChat.Prompts.Count;
             cardEntry.Close(); Call(flow,"Resume",cardId); cardEntry=Chats().Last(); await Ready(cardEntry);
             cardChat=Draft(cardEntry).Chat!;
-            Check(cardChat.UseQuestionTypeDefaults && cardChat.Model=="gpt-6.1-sol" && cardChat.Prompts.Count==beforePrompts, "重开保留类型默认策略和历史，不自动重发");
+            Check(cardChat.UseQuestionTypeDefaults && cardChat.Model=="gpt-6.2-sol" && cardChat.Prompts.Count==beforePrompts, "重开保留类型默认策略和历史，不自动重发");
             await Button(cardEntry,"新建对话"); var nextCard=Chats().Last(); await Ready(nextCard);
-            Check(Draft(nextCard).Chat!.UseQuestionTypeDefaults && Draft(nextCard).Chat!.Binding.Provider=="codex" && Draft(nextCard).Chat!.Model=="gpt-6.1-sol" && Draft(nextCard).Chat!.Prompts.Count==0, "卡页面新建对话继承自动类型匹配，仍等待输入与发送"); nextCard.Close(); cardEntry.Close();
+            Check(Draft(nextCard).Chat!.UseQuestionTypeDefaults && Draft(nextCard).Chat!.Binding.Provider=="codex" && Draft(nextCard).Chat!.Model=="gpt-6.2-sol" && Draft(nextCard).Chat!.Prompts.Count==0, "卡页面新建对话继承自动类型匹配，仍等待输入与发送"); nextCard.Close(); cardEntry.Close();
             WorkflowJson.Save(Path.Combine(data,"chat-preferences.json"),new ChatPreferences("api","deepseek-flash",null,"fast-answer"));
             var imageMaterial=new CaptureMaterial("公开单图卡",null,"generated_allowed",null,"",0,DateTimeOffset.UtcNow){FrontImage=mixed.Assets[0],VisualQuestion=true};
             Call(flow,"StartPreparedMaterial",imageMaterial,settings,"question",false); var imageCard=Chats().Last(); await Ready(imageCard);
-            Check(Draft(imageCard).Chat!.Binding.Provider=="codex" && Draft(imageCard).Chat!.Model=="gpt-6.1-sol" && Draft(imageCard).Chat!.Effort=="low" && Draft(imageCard).Chat!.Attachments.Count==1, "单图卡入口覆盖原 API 偏好，自动选 6.1 sol low 并保留图片");
+            Check(Draft(imageCard).Chat!.Binding.Provider=="codex" && Draft(imageCard).Chat!.Model=="gpt-6.2-sol" && Draft(imageCard).Chat!.Effort=="low" && Draft(imageCard).Chat!.Attachments.Count==1, "单图卡入口覆盖原 API 偏好，自动选 6.2 sol low 并保留图片");
             await Api(imageCard);
             await Command(imageCard,new{command="settings",typeId="chunk-solution"});
             Check(Draft(imageCard).Chat!.Binding.Provider=="api" && Draft(imageCard).Chat!.Model=="deepseek-flash" && Draft(imageCard).Chat!.Effort==null, "显式切换 API 后按 API 目录工作，类型切换不破坏服务和模型"); imageCard.Close();

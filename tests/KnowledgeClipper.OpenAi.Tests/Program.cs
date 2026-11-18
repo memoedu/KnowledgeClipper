@@ -6,7 +6,7 @@ using KnowledgeClipper.Workflow;
 var previous=Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 if(args.Contains("--live"))
 {
-    var liveSettings=new LanguageSettings { ApiBaseUrl="https://api.openai.com/v1",Model="gpt-6.1-sol" };
+    var liveSettings=new LanguageSettings { ApiBaseUrl="https://api.openai.com/v1",Model="gpt-6.2-sol" };
     using var liveHttp=new HttpClient();
     var liveModule=new ContentModule(liveHttp,()=>throw new Exception("domestic key must not be used"));
     var answer="";
@@ -22,7 +22,7 @@ if(args.Contains("--live"))
     var imageMaterial=new CaptureMaterial("图片是什么颜色？",null,"source",null,"synthetic image",0,DateTimeOffset.UtcNow)
         {VisualQuestion=true,FrontImage=asset};
     var imageAnswer=await liveModule.AnswerAsync(imageMaterial,null,[],"图片是什么颜色？",config,
-        liveSettings with {ImageModel="gpt-6.1-sol"},default);
+        liveSettings with {ImageModel="gpt-6.2-sol"},default);
     if(!imageAnswer.Answered || !imageAnswer.AnswerText!.Contains("红"))throw new Exception("Live image answer failed");
     Directory.CreateDirectory(args[1]);
     WorkflowJson.Save(Path.Combine(args[1],"live.json"),new {stream=answer,structured=translated,image=imageAnswer,externalWrites=false});
@@ -32,7 +32,7 @@ if(args.Contains("--live"))
 try
 {
     Environment.SetEnvironmentVariable("OPENAI_API_KEY","synthetic-openai-test");
-    var settings=new LanguageSettings { ApiBaseUrl="https://api.openai.com/v1",Model="gpt-6.1-sol" };
+    var settings=new LanguageSettings { ApiBaseUrl="https://api.openai.com/v1",Model="gpt-6.2-sol" };
     foreach(var complete in new[]{true,false})
     {
         using var http=new HttpClient(new Handler(complete));
