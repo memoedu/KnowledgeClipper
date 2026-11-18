@@ -36,7 +36,7 @@ public sealed class ChatCoordinator(ClipDraft draft, DraftStore store, ChatConfi
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
             var openai = OpenAiTransport.Selected(draft.Settings);
             return document.RootElement.GetProperty("data").EnumerateArray()
-                .Where(m => !openai || m.GetProperty("id").GetString() is "gpt-6-luna" or "gpt-6.1-sol").Select(m =>
+                .Where(m => !openai || m.GetProperty("id").GetString() is "gpt-6-luna" or "gpt-6.2-sol" or "gpt-6.1-sol").Select(m =>
             {
                 var id = m.GetProperty("id").GetString()!;
                 var efforts = m.TryGetProperty("effort", out var effort) ? effort : default;
