@@ -39,6 +39,7 @@ def build(browser, chat, output):
     if len(notices) != 2:
         raise ValueError('Missing .NET runtime redistribution notices.')
     entries['DOTNET-NOTICES.txt'] = b'\n\n'.join(notices)
+    entries['MANAGED-NOTICES.txt'] = (Path(__file__).resolve().parents[1] / 'licenses/managed-NOTICES.txt').read_bytes().replace(b'\r\n', b'\n')
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent) as tmp:
         install(tmp, os.environ.get('KC_MATH_MODULE_DIR'))
