@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && vite build && node scripts/build-mermaid.mjs && node scripts/notices.mjs"
+    "build": "tsc --noEmit && vite build && node scripts/build-mermaid.mjs && node scripts/build-math-reader.mjs && node scripts/notices.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.25",

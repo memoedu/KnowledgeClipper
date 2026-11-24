@@ -76,4 +76,5 @@
     <Content Include="..\workers\image-ocr\candidates\1.2.2\image-ocr-capability-config-descriptor.v4.json" Link="descriptors\image-ocr-capability-config-descriptor.v4.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\workers\image-ocr\candidates\1.2.3\image-ocr-capability-config-descriptor.v5.json" Link="descriptors\image-ocr-capability-config-descriptor.v5.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../workflow/KnowledgeClipper.Workflow.csproj" /></ItemGroup>
 </Project>

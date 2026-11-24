@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishTrimmed>true</PublishTrimmed>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <BlazorEnableCompression>true</BlazorEnableCompression>
+  </PropertyGroup>
+  <ItemGroup>
+    <TrimmerRootAssembly Include="KnowledgeClipper.Browser" />
+    <TrimmerRootAssembly Include="KnowledgeClipper.Workflow" />
+    <TrimmerRootAssembly Include="NJsonSchema" />
+    <TrimmerRootAssembly Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.30" />
+    <ProjectReference Include="../../workflow/KnowledgeClipper.Workflow.csproj" />
+  </ItemGroup>
+</Project>

@@ -75,7 +75,7 @@ internal sealed class ImageDesktopFlow : IDisposable
     {
         var artifact = StageClipboardImage(png);
         var snapshot = Snapshot();
-        var job = store.Create([(artifact.sourcePath, "question")], quick && intent == "excerpt" || snapshot.OriginalImageMode == true ? MaterialKind.OriginalImages : MaterialKind.OcrImages,
+        var job = store.Create([(artifact.sourcePath, "question")], FloatingWorkflow.SingleImageKind(intent, quick, snapshot),
             snapshot, Defaults, language.ModeOverrides);
         ImageEntryRouting.SetSingle(job, intent, quick); store.Save(job);
         if (quick) _ = RunQuickAsync(job); else Open(job);

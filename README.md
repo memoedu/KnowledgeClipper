@@ -57,6 +57,16 @@ pwsh -NoProfile -File ./build.ps1 -BuildOutput D:/Artifacts/KnowledgeClipper/bui
 
 测试先构建项目，再运行准确 DLL；Windows 长任务使用既有超时包装。常规回归在 `tests`，前端真实验收使用 `tools/Invoke-IsolatedDesktopTest.ps1` 的隔离桌面。host/plugin 各自运行 `npm test`；插件另运行 `npm run typecheck`。真实模型、Anki 与 RemNote 验收仅使用独立公开样本，保留原身份与失败回执，不以删除回执重跑未知请求。
 
+## 网站中的浮点操作
+
+GraspMemoEdu 复用 `workflow` 中的浮点路由、选区、语言卡、摘录和问答编辑器。`web/floating` 将该程序集发布为浏览器可运行的 WebAssembly，`web/chat` 同时为 WebView2 和网页构建卡片编辑器。网站宿主提供当前账号的存储和模型连接。
+
+选择一句或一段上下文时，公式按完整的数学内容保留。来源带有公式时，朗读使用同一段文字的数学读法。卡片和摘录保留可编辑的 LaTeX。公式朗读按需加载 KaTeX 和 MathCAT 的中英文规则。桌面用 Node 调用相同模块。
+
+桌面构建继续使用 `build.ps1`。它按 `web/math-speech/runtime-lock.json` 校验数学朗读运行文件。离线构建可用 `KC_MATH_MODULE_DIR` 指定已下载的同版本模块。使用锁定的 Rust 和 wasm-bindgen，在已安装 `wasm32-unknown-unknown` 目标的平台可执行 `python tools/math_runtime.py <输出目录> --build <编译缓存目录>` 从源重建。
+
+网站发布时先构建 `web/chat`，再执行 `dotnet publish web/floating/KnowledgeClipper.Browser.csproj -c Release -o <发布目录>`。用 `python tools/package_floating.py <发布目录>/wwwroot <聊天构建输出> <输出目录>/knowledge-clipper-web.zip` 打包。使用 `dotnet run --project tools/ExportFloatingCatalog -c Release -- modes <输出目录>/clipper_catalog.json` 生成同一提交的设置与模式清单。
+
 ## 数据与恢复边界
 
 - 用户数据位于 `D:/AppData/KnowledgeClipper`，源码、缓存和产物分别位于 `D:/Projects`、`D:/Caches`、`D:/Artifacts`；误放的测试回执可恢复归档到 `D:/Quarantine`。

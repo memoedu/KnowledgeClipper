@@ -42,6 +42,9 @@ public static class PublishedLanguage
         if (root.GetProperty("generatedTargetStart").ValueKind != JsonValueKind.Null)
             throw new InvalidDataException("模型不得返回生成例句的数值位置，位置由程序计算。");
         var fields = JsonSerializer.Deserialize<LanguageFields>(json, WorkflowJson.Options)! with { Format = Format };
+        if (material.ContextText is { } source && (ReadingSpeech.HasFormula(source) ||
+                source.Contains((char)96) || source.Contains("](asset:", StringComparison.Ordinal)))
+            fields = fields with { NormalizedSentence = null };
         if ((material.SourceTitle.StartsWith("Tatoeba #", StringComparison.Ordinal) ||
              material.SourceTitle.StartsWith("Wiktionary ·", StringComparison.Ordinal)) && fields.NormalizedSentence != null)
             throw new InvalidDataException("开放语料例句必须原样保留，不能改写英文原句。");

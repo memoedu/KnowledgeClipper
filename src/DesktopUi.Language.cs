@@ -72,12 +72,17 @@ internal sealed partial class BoundClipperForm
             var current = selectionMonitor.TryConsume(selection);
             selectionDot.HideSelection();
             languageFlow.HideMeaning();
-            if (current) _ = action switch {
-                SelectionDotAction.Ask => languageFlow.StartQuickQuestionAsync(selection),
-                SelectionDotAction.Question => languageFlow.StartQuestionAsync(selection, languageFlow.Settings.QuickQuestion),
-                SelectionDotAction.Excerpt => excerptFlow.StartAsync(selection, languageFlow.Settings.QuickExcerpt),
-                _ => languageFlow.StartLanguageAsync(selection, languageFlow.Settings.QuickLanguage)
-            };
+            if (current)
+            {
+                var route = FloatingWorkflow.Resolve((FloatingAction)action, false, languageFlow.Settings);
+                _ = route.Intent switch {
+                    "question" when route.SendOnce => languageFlow.StartQuickQuestionAsync(selection),
+                    "question" => languageFlow.StartQuestionAsync(selection, route.Quick),
+                    "excerpt" => excerptFlow.StartAsync(selection, route.Quick),
+                    "language" => languageFlow.StartLanguageAsync(selection, route.Quick),
+                    _ => throw new InvalidOperationException("未知的文字浮点操作。")
+                };
+            }
             else SetStatus("选区已变化，请重新选择文字", Color.FromArgb(38, 90, 150), Color.FromArgb(238, 245, 255));
         });
         selectionMonitor = new LanguageSelectionMonitor(this, Path.Combine(AppContext.BaseDirectory, "helpers", "selection.cjs"),
@@ -195,10 +200,9 @@ internal sealed partial class BoundClipperForm
         {
             var png = snapshot.PngBytes.ToArray();
             if (snapshot.Original != null) await Task.Run(() => ClipboardImageLinkLoader.SaveOriginal(config.WorkDirectory, snapshot));
-            if (action == ClipboardImageDotAction.Excerpt) imageFlow.StartClipboardImage(png, "excerpt", languageFlow.Settings.QuickExcerpt);
-            else if (action == ClipboardImageDotAction.Read) imageFlow.StartClipboardImage(png, "language", languageFlow.Settings.QuickLanguage);
-            else if (action == ClipboardImageDotAction.Question) imageFlow.StartClipboardImage(png, "question", languageFlow.Settings.QuickQuestion);
-            else if (action == ClipboardImageDotAction.Ask) await languageFlow.StartQuestionInputAsync("", new[] { png }, true);
+            var route = FloatingWorkflow.Resolve((FloatingAction)action, true, languageFlow.Settings);
+            if (route.SendOnce) await languageFlow.StartQuestionInputAsync("", new[] { png }, true);
+            else if (!route.CollectImages) imageFlow.StartClipboardImage(png, route.Intent, route.Quick);
             else
             {
                 if (busy) { SetStatus("正在截图，请完成当前采集后继续", Color.FromArgb(38, 90, 150), Color.FromArgb(238, 245, 255)); return; }

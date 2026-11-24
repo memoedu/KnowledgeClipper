@@ -92,8 +92,7 @@ internal sealed partial class LanguageDesktopFlow
         {
             var context = draft.Original.LookupContextText ?? draft.Original.ContextText;
             if (string.IsNullOrWhiteSpace(context)) { draft.LookupError = "未识别到当前句子"; return null; }
-            var cached = match.Candidates.Select(item => item.Lookup)
-                .FirstOrDefault(item => item != null && item.ContextText == context);
+            var cached = ReadingHistoryPolicy.Meaning(match, context);
             if (cached != null) draft.Lookup = cached;
             else
             {
@@ -116,28 +115,12 @@ internal sealed partial class LanguageDesktopFlow
         }
     }
 
-    private static string PronunciationKey(string value) => new string((value ?? "").Where(c => !char.IsWhiteSpace(c) && c is not ('/' or '[' or ']')).ToArray());
-
     private async Task PlayEntryAsync(ClipDraft draft, LanguageHistoryMatch match, Task<LanguageLookupResult> meaning, long epoch)
     {
         if (!draft.Input.ReadRequested) return;
         // Reserve playback before any content task can try to start it a second time.
         draft.Times["speechRequested"] = DateTimeOffset.UtcNow;
-        var candidates = match.Candidates.Where(item => item.CanPlay).ToArray();
-        LanguageHistoryCandidate recorded = null;
-        if (!draft.Settings.ContextEnabled) recorded = candidates.FirstOrDefault();
-        else
-        {
-            recorded = candidates.FirstOrDefault(item => !string.IsNullOrWhiteSpace(draft.Original.ContextText) &&
-                item.AudioContextText == draft.Original.ContextText);
-            if (recorded == null && candidates.Length > 0)
-            {
-                var currentMeaning = await meaning;
-                if (currentMeaning?.Pronunciation != null)
-                    recorded = candidates.FirstOrDefault(item => !string.IsNullOrWhiteSpace(item.Pronunciation) &&
-                        PronunciationKey(item.Pronunciation) == PronunciationKey(currentMeaning.Pronunciation));
-            }
-        }
+        var recorded = await ReadingHistoryPolicy.Recording(match, draft.Original, draft.Settings.ContextEnabled, meaning);
         if (epoch != languageEntryEpoch || lifetime.IsCancellationRequested)
         { draft.SpeechStatus = "已由后续朗读替代"; return; }
         if (recorded != null)
@@ -163,7 +146,7 @@ internal sealed partial class LanguageDesktopFlow
                 match = new(found.Candidates.Where(item => !pendingHistoryEntries.Contains(item.SourceId) &&
                     !pendingHistoryEntries.Contains(item.SessionId)).ToArray());
                 draft.MatchedHistoryId = match.Candidates.FirstOrDefault()?.SourceId;
-                draft.HistoryReplayOnly = quick && draft.MatchedHistoryId != null;
+                draft.HistoryReplayOnly = ReadingHistoryPolicy.ReplayOnly(quick, match);
                 historyLookup.Remember(draft);
                 pendingHistoryEntries.Remove(draft.Id);
             }

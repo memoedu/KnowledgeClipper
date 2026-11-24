@@ -1,0 +1,16 @@
+[package]
+name = "knowledgeclipper-math-speech"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mathcat = { version = "=0.7.8", default-features = false, features = ["include-zip", "lang-en", "lang-zh"] }
+
+[profile.release]
+lto = true
+opt-level = "s"
+strip = "debuginfo"

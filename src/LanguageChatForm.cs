@@ -193,30 +193,13 @@ internal sealed class LanguageChatForm : Form
         ChatConfiguration current;
         try { current = config.Load(); } catch (Exception ex) { error = ex.Message; current = new([]); }
         var exportStatus = root.Compositions.ToDictionary(c => c.Id, ExportStatus);
-        var sourceIds = root.Compositions.SelectMany(c => c.FrontSources.Concat(c.BackSources)).ToHashSet();
-        object Tab(string id, string title, ChatSession session) => new { id, title, busy = conversations.TryGetValue(session, out var c) && c.Busy,
-            forking = session.Fork is { Stage: not "verified" },
-            needsReconciliation = session.Binding.NeedsReconciliation || session.Fork is { Stage: not "verified" } };
-        web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new {
-            draftId = Draft.Id, conversationId = root.ActiveConversationId,
-            tabs = ChatWorkspace.OpenIds(root).Select(id => Tab(id, id == "main" ? "原对话" : root.Branches.Single(b => b.Id == id).Title, ChatWorkspace.Session(root, id))),
-            canUndoClose = root.ClosedTabs.Count > 0,
-            busy = Busy, conversationBusy = coordinator.Busy && chat.Fork is not { Stage: not "verified" }, error = error ?? chat.Binding.Error,
-            status = auxiliaryCoordinator.Busy ? "正在处理卡片…" : coordinator.Busy && chat.Fork is { Stage: not "verified" } ? "正在建立或核对分叉…" : coordinator.Busy ? "正在回复…" : Busy ? "其他对话正在处理…" : chat.Binding.NeedsReconciliation ? "结果待核对" : "草稿已保存",
-            provider = chat.Binding.Provider, chat.Model, chat.Effort, chat.TypeId, chat.Input, chat.IncludeExamples, chat.UseQuestionTypeDefaults,
-            messages = chat.Messages.TakeLast(visibleCount).Select(m => new { m.Id, m.Role, m.Status, m.TypeId, m.Action, m.CreatedAt, canFork = ChatWorkspace.CanFork(chat, m),
-                parts = m.Parts.Select((p, i) => new { p.Kind, p.Text, displayText = Display(m.Id + ":" + i, p.Text), copyMath = CopyMath(m.Id + ":" + i, p.Text), image = p.Image == null ? null : new { p.Image.Sha256 } }) }),
-            total = chat.Messages.Count, hasSent = chat.Prompts.Count > 0, models, types = current.Types, attachments = chat.Attachments.Select(a => new { a.Sha256 }),
-            sourceMessages = ChatWorkspace.Messages(root).Where(m => sourceIds.Contains(m.Id)).Select(m => new { m.Id, title = m.Text.Length > 32 ? m.Text[..32] + "…" : m.Text,
-                conversation = root.Messages.Any(x => x.Id == m.Id) ? "原对话" : root.Branches.First(b => b.Session.Messages.Any(x => x.Id == m.Id)).Title }),
-            cards = root.Compositions.Select(c => new { c.Id, c.TypeId, c.FrontSources, c.BackSources, c.Front, c.Back, c.Annotation, c.AnnotationEnabled, c.FrontAnnotation, c.FrontAnnotationEnabled, c.Revision,
-                c.ManuallyEdited, c.SourcesChanged, c.ExportDraftId, canUndo = c.ExportDraftId == null && c.UndoHistory.Count > 0,
-                canRedo = c.ExportDraftId == null && c.RedoHistory.Count > 0 }),
-            proposals = root.Proposals, exportStatus, cardPreview, needsReconciliation = chat.Binding.NeedsReconciliation || chat.Fork is { Stage: not "verified" },
-            auxiliary = new { provider = root.Auxiliary.Provider, model = root.Auxiliary.Current.Model, effort = root.Auxiliary.Current.Effort,
-                models = auxiliaryModels, loading = auxiliaryModelsLoading, busy = auxiliaryCoordinator.Busy,
-                error = auxiliaryError ?? root.Auxiliary.Current.Binding.Error, needsReconciliation = root.Auxiliary.Current.Binding.NeedsReconciliation }
-        }, ViewJson));
+        var auxiliary = new { provider = root.Auxiliary.Provider, model = root.Auxiliary.Current.Model, effort = root.Auxiliary.Current.Effort,
+            models = auxiliaryModels, loading = auxiliaryModelsLoading, busy = auxiliaryCoordinator.Busy,
+            error = auxiliaryError ?? root.Auxiliary.Current.Binding.Error, needsReconciliation = root.Auxiliary.Current.Binding.NeedsReconciliation };
+        var state = ChatView.Build(Draft.Id, root, current.Types, models, visibleCount, Display, CopyMath,
+            session => conversations.TryGetValue(session, out var c) && c.Busy, Busy, coordinator.Busy, auxiliaryCoordinator.Busy,
+            error, exportStatus, cardPreview, auxiliary);
+        web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(state, ViewJson));
     }
 
     internal async Task CommandAsync(JsonElement e)
@@ -230,6 +213,13 @@ internal sealed class LanguageChatForm : Form
                 throw new InvalidOperationException("对话已切换；原操作未应用到其他 Tab。");
         }
         CardComposition Card() => root.Compositions.Single(c => c.Id == Text("cardId"));
+        if (ChatEditorCommands.Apply(root, e, out var clearPreview))
+        {
+            if (clearPreview) cardPreview = null;
+            Save();
+            Publish();
+            return;
+        }
         switch (command)
         {
             case "ready":
@@ -350,31 +340,6 @@ internal sealed class LanguageChatForm : Form
                     side == "annotation" ? Insert() : null, side == "annotation" ? true : null,
                     side == "frontAnnotation" ? Insert() : null, side == "frontAnnotation" ? true : null);
                 cardPreview = null; Save(); break;
-            case "addCard": root.Compositions.Add(new() { TypeId = chat.TypeId }); Save(); break;
-            case "copyCard": ChatComposition.Editable(root, Card()); Save(); break;
-            case "select": ChatComposition.Select(root, Card(), Text("messageId"), Text("side"), e.GetProperty("selected").GetBoolean()); Save(); break;
-            case "editCard":
-                var editedCard = Card();
-                ChatComposition.Edit(editedCard,
-                    e.TryGetProperty("front", out var frontEdit) ? ChatMarkdown.NormalizeMediaReferences(frontEdit.GetString(), root.Assets) : editedCard.Front,
-                    e.TryGetProperty("back", out var backEdit) ? ChatMarkdown.NormalizeMediaReferences(backEdit.GetString(), root.Assets) : editedCard.Back,
-                    e.TryGetProperty("typeId", out var typeEdit) ? typeEdit.GetString() : editedCard.TypeId,
-                    e.TryGetProperty("annotation", out var annotationEdit) ? ChatMarkdown.NormalizeMediaReferences(annotationEdit.GetString(), root.Assets) : null,
-                    e.TryGetProperty("annotationEnabled", out var annotationEnabled) ? annotationEnabled.GetBoolean() : null,
-                    e.TryGetProperty("frontAnnotation", out var frontAnnotationEdit) ? ChatMarkdown.NormalizeMediaReferences(frontAnnotationEdit.GetString(), root.Assets) : null,
-                    e.TryGetProperty("frontAnnotationEnabled", out var frontAnnotationEnabled) ? frontAnnotationEnabled.GetBoolean() : null);
-                cardPreview = null; Save(); break;
-            case "move": ChatComposition.Move(root, Card(), Text("side"), e.GetProperty("index").GetInt32(), e.GetProperty("offset").GetInt32()); Save(); break;
-            case "rebuild": ChatComposition.Rebuild(root, Card()); Save(); break;
-            case "undo": ChatComposition.Undo(Card(), root); cardPreview = null; Save(); break;
-            case "redo": ChatComposition.Redo(Card(), root); cardPreview = null; Save(); break;
-            case "roundCard":
-                var selected = chat.Messages.Single(m => m.Id == Text("messageId")); var index = chat.Messages.IndexOf(selected);
-                var user = selected.Role == "user" ? selected : chat.Messages.Take(index).LastOrDefault(m => m.Role == "user" && m.Action == null);
-                if (user == null) throw new InvalidDataException("没有对应问题。");
-                var next = chat.Messages.Skip(chat.Messages.IndexOf(user) + 1).TakeWhile(m => m.Role != "user").Where(m => m.Role == "assistant" && m.Action == null).ToArray();
-                var newCard = new CardComposition { TypeId = user.TypeId, FrontSources = [user.Id], BackSources = next.Select(m => m.Id).ToList() };
-                ChatComposition.Rebuild(root, newCard); root.Compositions.Add(newCard); Save(); break;
             case "cardImage":
                 var card = Card(); if (card.ExportDraftId != null) throw new InvalidOperationException("请先编辑为新草稿。");
                 var added = new List<ImageAsset>(); ChooseImages(added);

@@ -61,7 +61,10 @@ internal sealed class LanguageSettingsForm : Form
             Checked = value.ShowDictionaryInPreview, AutoSize = true, Name = "knowledge-clipper.language.show-dictionary-preview" };
         Add("划词词典", showDictionary);
         var context = new CheckBox { Text = "使用来源上下文", Checked = value.ContextEnabled, AutoSize = true, Name = "knowledge-clipper.language.context-enabled" };
-        var granularity = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Name = "knowledge-clipper.language.context-granularity" }; granularity.Items.AddRange(new[] { "一句", "一段" }); granularity.SelectedIndex = value.ContextGranularity == "paragraph" ? 1 : 0;
+        var scopeChoices = FloatingSettings.Fields.Single(f => f.Key == "contextGranularity").Choices!;
+        var granularity = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Name = "knowledge-clipper.language.context-granularity" };
+        granularity.Items.AddRange(scopeChoices.Select(choice => choice.Label).ToArray());
+        granularity.SelectedIndex = Array.FindIndex(scopeChoices, choice => choice.Value == value.ContextGranularity);
         Add("上下文", context); Add("上下文范围", granularity);
         Page("浮点", "floating");
         var globalSelection = new CheckBox { Text = "选中文字时显示浮点", Checked = value.GlobalSelection, AutoSize = true,
@@ -410,7 +413,7 @@ internal sealed class LanguageSettingsForm : Form
                     MineruTable = mineruTable.Checked, MineruFormula = mineruFormula.Checked, MineruTimeoutSeconds = (int)mineruTimeout.Value,
                     QuestionCardIncludeContext = questionCardContext.Checked,
                     ShowDictionaryInPreview = showDictionary.Checked,
-                    ContextEnabled = context.Checked, ContextGranularity = granularity.SelectedIndex == 1 ? "paragraph" : "sentence",
+                    ContextEnabled = context.Checked, ContextGranularity = scopeChoices[Math.Max(0, granularity.SelectedIndex)].Value,
                     Practice = (PracticeChoice)practice.SelectedIndex, AutoVoice = autoVoice.Checked, Voice = VoiceId(voice), EnglishVoice = VoiceId(englishVoice),
                     SpeechAutoPlay = speechAutoPlay.Checked, ContentTimeoutSeconds = (int)contentTimeout.Value, ContentMaxRetries = (int)contentRetries.Value,
                     PythonPath = python.Text.Trim(), NodePath = node.Text.Trim(), FfplayPath = ffplay.Text.Trim(),

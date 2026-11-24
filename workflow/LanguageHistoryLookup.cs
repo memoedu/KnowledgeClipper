@@ -31,7 +31,7 @@ public sealed class LanguageHistoryLookup
         Ready = Task.Run(() => RefreshAsync());
     }
 
-    private static string Key(string text) => Regex.Replace(text.Normalize(NormalizationForm.FormC).Trim(), @"\s+", " ").ToUpperInvariant();
+    public static string Key(string text) => Regex.Replace(text.Normalize(NormalizationForm.FormC).Trim(), @"\s+", " ").ToUpperInvariant();
 
     public void Remember(ClipDraft draft)
     {
@@ -101,10 +101,10 @@ public sealed class LanguageHistoryLookup
                 var audio = draft.ReusedSpeech;
                 var owner = draft;
                 if (audio == null && draft.AudioPath == null && parent != null) { owner = parent; audio = parent.ReusedSpeech; }
-                var audioText = audio?.Text ?? owner.Original.SelectedText;
+                var audioText = audio?.Text ?? owner.RecordedText ?? owner.Original.SelectedText;
                 var settings = audio?.Settings ?? owner.Settings;
                 var path = audio?.AudioPath ?? owner.AudioPath;
-                var canPlay = Key(audioText) == Key(selectedText) && ValidAudio(audioText, settings, path);
+                var canPlay = ValidAudio(audioText, settings, path);
                 var children = draft.ModeCards.Values.Select(childId => drafts.GetValueOrDefault(childId))
                     .Where(child => child != null && ValidParent(child)?.Id == draft.Id).Cast<ClipDraft>().ToArray();
                 var hasCard = HasCard(draft) || children.Any(HasCard);
@@ -131,9 +131,9 @@ public sealed class LanguageHistoryLookup
             if (!visited.Add(owner.Id) || !drafts.TryGetValue(reference.SourceDraftId, out var source)) return null;
             var sourceReference = source.ReusedSpeech;
             if (!string.Equals(reference.AudioPath, sourceReference?.AudioPath ?? source.AudioPath, StringComparison.OrdinalIgnoreCase) ||
-                reference.Text != (sourceReference?.Text ?? source.Original.SelectedText) ||
+                reference.Text != (sourceReference?.Text ?? source.RecordedText ?? source.Original.SelectedText) ||
                 StreamingSpeech.AudioCacheKey(reference.Text, SpeechPurpose.Selection, reference.Settings) !=
-                StreamingSpeech.AudioCacheKey(sourceReference?.Text ?? source.Original.SelectedText, SpeechPurpose.Selection, sourceReference?.Settings ?? source.Settings)) return null;
+                StreamingSpeech.AudioCacheKey(sourceReference?.Text ?? source.RecordedText ?? source.Original.SelectedText, SpeechPurpose.Selection, sourceReference?.Settings ?? source.Settings)) return null;
             owner = source;
         }
         return owner;

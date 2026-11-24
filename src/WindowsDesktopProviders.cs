@@ -587,8 +587,7 @@ namespace KnowledgeClipper
                     prefix = documentText.Substring(0, index);
                     suffix = documentText.Substring(index + selectedText.Length);
                 }
-                prefix = SlicePrefix(prefix, granularity);
-                suffix = SliceSuffix(suffix, granularity);
+                (prefix, suffix) = Workflow.SelectionContext.Scope(prefix, selectedText, suffix, granularity);
                 if (string.IsNullOrWhiteSpace(prefix) && string.IsNullOrWhiteSpace(suffix)) return false;
                 context = new WindowsContextSnapshot { Prefix = prefix, Suffix = suffix };
                 return true;
@@ -598,28 +597,6 @@ namespace KnowledgeClipper
             catch (COMException) { return false; }
         }
 
-        private static string SlicePrefix(string value, string granularity)
-        {
-            value = LimitTail(value ?? string.Empty);
-            var delimiters = granularity == "paragraph" ? new[] { '\n', '\r' } : new[] { '。', '！', '？', '.', '!', '?', '\n', '\r' };
-            var index = value.LastIndexOfAny(delimiters);
-            // These are source segments, not display strings. Boundary whitespace
-            // is required to reconstruct prefix + selected + suffix losslessly.
-            return index >= 0 ? value.Substring(index + 1) : value;
-        }
-
-        private static string SliceSuffix(string value, string granularity)
-        {
-            value = LimitHead(value ?? string.Empty);
-            var delimiters = granularity == "paragraph" ? new[] { '\n', '\r' } : new[] { '。', '！', '？', '.', '!', '?', '\n', '\r' };
-            var index = value.IndexOfAny(delimiters);
-            // Retain sentence punctuation but exclude the next paragraph boundary.
-            // Horizontal whitespace next to the selected text remains untouched.
-            return index >= 0 ? value.Substring(0, index + (value[index] == '\r' || value[index] == '\n' ? 0 : 1)) : value;
-        }
-
-        private static string LimitTail(string value) { return value.Length <= MaximumSegmentCharacters ? value : value.Substring(value.Length - MaximumSegmentCharacters); }
-        private static string LimitHead(string value) { return value.Length <= MaximumSegmentCharacters ? value : value.Substring(0, MaximumSegmentCharacters); }
     }
 
     internal interface IScreenshotShortcutSender

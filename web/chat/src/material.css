@@ -1,0 +1,14 @@
+.message-body [data-streamdown="code-block"]{min-width:0;max-width:100%;overflow-x:auto}
+/* Streamdown emits one span per source line, including empty lines. */
+.message-body [data-streamdown="code-block-body"] pre code>span{display:block;min-height:1lh}
+
+.clipperMaterial{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.clipperMaterial p{margin:.4em 0;white-space:normal}
+.clipperMaterial [data-streamdown="code-block"]{margin:.65em 0;border:1px solid #91a0ac55;border-radius:.35em;padding:.45em .7em}
+.clipperMaterial [data-streamdown="code-block-header"]{font-size:.82em;color:GrayText}
+.clipperMaterial pre{margin:.3em 0;white-space:pre;overflow-wrap:normal;overflow-x:auto}
+.clipperMaterial pre code{white-space:pre}
+.clipperMaterial img{display:inline-block;max-width:100%;height:auto;vertical-align:middle}
+.clipperMaterial table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse}
+.clipperMaterial td,.clipperMaterial th{padding:.25em .5em;border:1px solid #91a0ac55}
+.clipperMaterial .katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden}

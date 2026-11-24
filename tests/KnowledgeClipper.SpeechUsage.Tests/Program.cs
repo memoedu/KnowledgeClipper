@@ -103,6 +103,8 @@ namespace KnowledgeClipper.Workflow
         public string PythonPath { get; init; } = Environment.GetEnvironmentVariable("KNOWLEDGECLIPPER_CODEX_PYTHON") ??
             @"D:\Applications\RemNoteQuickClipperRuntime\edge-tts-7.2.8\Scripts\python.exe";
         public string FfplayPath { get; init; } = "unused";
+        public string NodePath { get; init; } = "node";
+        public bool ContextEnabled { get; init; }
         public bool AutoVoice { get; init; } = true;
         public bool SpeechAutoPlay { get; init; } = true;
         public string Voice { get; init; } = "zh-CN-XiaoxiaoNeural";
@@ -111,13 +113,14 @@ namespace KnowledgeClipper.Workflow
         public int VolumePercent { get; init; }
         public int PitchHz { get; init; }
     }
-    public sealed record CaptureMaterial(string SelectedText);
+    public sealed record CaptureMaterial(string SelectedText, string? ContextText = null);
     public sealed class ClipDraft
     {
         public string Id { get; set; } = "test";
         public CaptureMaterial Original { get; set; } = new("selected");
         public LanguageSettings Settings { get; set; } = new();
         public string? AudioPath { get; set; }
+        public string? RecordedText { get; set; }
         public string? SpeechStatus { get; set; }
         public string? SpeechError { get; set; }
         public System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> Times { get; } = new();
