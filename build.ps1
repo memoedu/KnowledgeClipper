@@ -26,6 +26,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $env:KC_CHAT_OUTPUT = Join-Path $BuildOutput 'chat-view'
 & npm run build --prefix $chatRoot
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& python (Join-Path $projectRoot 'tools/math_runtime.py') (Join-Path $env:KC_CHAT_OUTPUT 'math')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $DotnetPath build (Join-Path $projectRoot 'desktop\RemNoteQuickClipper.Desktop.csproj') -c Release --nologo "-p:KnowledgeClipperBuildOutput=$BuildOutput" "-p:KnowledgeClipperBuildCache=$BuildCache" "-p:KnowledgeClipperChatOutput=$env:KC_CHAT_OUTPUT"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($InstallShortcut -or $BuildOutput -eq 'D:\Artifacts\KnowledgeClipper\build') {

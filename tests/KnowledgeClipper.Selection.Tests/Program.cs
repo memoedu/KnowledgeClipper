@@ -30,6 +30,7 @@ internal static class Program
             CheckReadRecovery();
             CheckPointerEndpoint();
             CheckWordBoundaries();
+            CheckFormulaContexts();
             CheckGestures();
             CheckWheelGestures();
             CheckInputLifecycle();
@@ -287,6 +288,34 @@ internal static class Program
         var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
         Check((Point)Property(result, "Anchor")! == new Point(-40, 120) && (bool)Property(result, "PositionValid")!,
             "native parser uses the selection top-right corner and preserves negative monitor coordinates");
+    }
+
+    private static void CheckFormulaContexts()
+    {
+        var selection = "成立";
+        var (prefix, suffix) = SelectionContext.Scope(@"前句。结论成立。当 \(0.25<x\) 时，结论", selection, "。后句。", "sentence", true);
+        var material = SelectionContext.Build(selection, prefix, suffix, true, "fixture", 0, DateTimeOffset.UtcNow, true);
+        Check(material.ContextText == @"当 \(0.25<x\) 时，结论成立。", "inline formula remains inside this exact source sentence");
+        Check(ReadingSpeech.Text(material, true) == material.ContextText && ReadingSpeech.Text(material, false) == selection,
+            "a context-dependent formula goes to speech only with context enabled");
+        Check(PublishedLanguage.MarkedContext(material) == @"当 \(0.25&lt;x\) 时，结论<selected>成立</selected>。",
+            "language cards retain the marked occurrence and original formula");
+        var soft = SelectionContext.Scope("上一段。\n\nA line\nwith ", @"\(f(x)=1.5\)", " is valid. Next.", "sentence", true);
+        Check(soft == ("A line\nwith ", " is valid."), "source line wrapping and decimals do not end a formula sentence");
+        var mixed = @"示例 `\(literal?\)`，由\(x^2=0.25\)可知 $y$ 成立。";
+        var parts = ReadingSpeech.Parts(mixed);
+        Check(parts.Where(p => p.Math).Select(p => p.Text).SequenceEqual(new[] {"x^2=0.25", "y"}) &&
+            parts[0].Text.Contains(@"`\(literal?\)`"), "math adjacent to Chinese is spoken while literal code stays verbatim");
+        var codeContext = SelectionContext.Scope(@"别句。请运行 `ready?` 的例子，再由\(x=0.25\)得到", "结论", "。后句。", "sentence", true);
+        Check(codeContext == (@"请运行 `ready?` 的例子，再由\(x=0.25\)得到", "。"), "punctuation inside code and math does not split the sentence");
+        Check(!ReadingSpeech.HasFormula("  ~~~text\n\\(literal\\)\n  ~~~") && !ReadingSpeech.HasFormula(@"付 \$5"),
+            "a fenced code example and escaped currency are not formulas");
+        var windowsText = SelectionContext.Scope("上一段。\r\n\r\n由\r\n", "条件", "得到结论\r\n\r\n下一段。", "paragraph", true);
+        Check(windowsText == ("由\r\n","得到结论"), "paragraph scope also handles Windows line endings");
+        var complete = SelectionContext.Scope("Other. ", "The result holds.", " Next sentence.", "sentence", true);
+        Check(complete == ("", ""), "a selected sentence keeps its own terminal punctuation");
+        var paragraph = SelectionContext.Scope("First.\n\nFirst premise. Second ", "term", " follows.\n\nNext.", "paragraph", true);
+        Check(paragraph == ("First premise. Second ", " follows."), "paragraph scope keeps multiple sentences within the paragraph");
     }
 
     private static void CheckWordBoundaries()

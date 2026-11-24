@@ -342,60 +342,8 @@ internal sealed partial class LanguageDesktopFlow : IDisposable
                     selected = LanguageModes.Select(draft.Configuration, draft.Material, draft.Practice, chosen);
                 }
                 var children = LanguageModeCards.Ensure(draft, selected, store);
-                var dictionaryTasks = children.Where(child => child.ConfirmedNote == null &&
-                    (child.DictionaryDetails == null || child.DictionaryDetails.Target != child.Material.SelectedText.Trim() ||
-                     child.DictionaryDetails.Language != child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language))
-                    .Select(child => child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language!)
-                    .Distinct(StringComparer.Ordinal).ToDictionary(language => language,
-                        language => new DirectDictionaryLookup(http).LookupAsync(draft.Material.SelectedText, language, cancellation));
-                var exampleTasks = children.Where(child => child.ConfirmedNote == null && child.NoteId == null &&
-                    child.Material.ContextText == null).Select(child =>
-                    child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language!)
-                    .Distinct(StringComparer.Ordinal).ToDictionary(language => language, async language =>
-                    {
-                        var details = dictionaryTasks.TryGetValue(language, out var pending) ? await pending :
-                            children.First(child => child.DictionaryDetails?.Language == language).DictionaryDetails;
-                        return await new AuthenticExampleLookup(http).FindWithFallbackAsync(draft.Material.SelectedText,
-                            language, details, cancellation);
-                    });
-                form?.ContentReady();
-                await Task.WhenAll(children.Select(async child =>
-                {
-                    if (child.Content != null && child.Content.Fields?.IsUnresolved != true || child.ConfirmedNote != null || child.NoteId != null) return;
-                    try
-                    {
-                        RefreshMissingModeConfiguration(child);
-                        child.ContentError = null;
-                        var dictionaryLanguage = child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language!;
-                        if (dictionaryTasks.TryGetValue(dictionaryLanguage, out var dictionaryTask))
-                            child.DictionaryDetails = await dictionaryTask;
-                        if (child.Material.ContextText == null)
-                        {
-                            var example = await exampleTasks[dictionaryLanguage];
-                            if (example == null) throw new InvalidDataException("开放语料没有找到包含原样词块的真实例句；请补充上下文后重试。");
-                            child.Material = AuthenticExampleLookup.Apply(child.Material, example.Value);
-                            child.DictionaryDetails = child.DictionaryDetails with
-                            { ExampleSentence = example.Value.Sentence, ExampleSource = example.Value.Source };
-                            store.Save(child);
-                        }
-                        child.Content = await content.ProcessAsync(child.Material, child.ModeId, child.Configuration, child.Settings, cancellation);
-                        child.EditedFields = null;
-                        child.Times["previewReady"] = DateTimeOffset.UtcNow;
-                    }
-                    catch (OperationCanceledException) { child.ContentError = "已停止本模式处理，原材料已保留。"; }
-                    catch (Exception ex) { child.ContentError = ex.Message; }
-                    finally { store.Save(child); if (form?.IsDisposed == false) form.ContentReady(); }
-                }));
-                foreach (var child in children.Where(child => child.ConfirmedNote == null &&
-                    (child.DictionaryDetails == null || child.DictionaryDetails.Target != child.Material.SelectedText.Trim() ||
-                     child.DictionaryDetails.Language != child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language)))
-                {
-                    var dictionaryLanguage = child.Configuration.Modes.Single(mode => mode.Definition.Id == child.ModeId).Definition.Language!;
-                    if (dictionaryTasks.TryGetValue(dictionaryLanguage, out var dictionaryTask))
-                        child.DictionaryDetails = await dictionaryTask;
-                    store.Save(child);
-                }
-                if (children.Length > 0) draft.DictionaryDetails = children[0].DictionaryDetails;
+                await ReadingCards.Prepare(draft, children, store, content, http, cancellation,
+                    () => { if (form?.IsDisposed == false) form.ContentReady(); }, RefreshMissingModeConfiguration);
                 store.Save(draft);
                 if (form?.IsDisposed == false) form.ContentReady();
                 draft.Times["previewReady"] = DateTimeOffset.UtcNow;

@@ -11,6 +11,7 @@ import './style.css';
 import {copySelection,pasteImages,type CopyMath} from './clipboard';
 import {SupplementalRequirements,composeRequirements,type RequirementOption} from './SupplementalRequirements';
 import {ActionButton,send,receiveCommandAck,usePendingActions,setCommandConversation} from './commands';
+import {host,imageUrl} from './host';
 
 type Part = {kind: string; text?: string; displayText?:string; copyMath?:CopyMath[]; image?: {sha256:string}};
 type Message = {id:string;role:'user'|'assistant';parts:Part[];status:string;typeId:string;action?:string;createdAt:string;canFork?:boolean};
@@ -18,12 +19,11 @@ type Card = {id:string;typeId:string;front:string;back:string;annotation?:string
 type Proposal = {id:string;action:string;targetSide?:'front'|'back';status:string;rawOutput:string;error?:string;cards:Card[]};
 type Model = {id:string;name:string;efforts:string[];inputModalities:string[];defaultEffort?:string};
 type Auxiliary = {provider:string;model:string;effort?:string;models:Model[];loading:boolean;busy:boolean;error?:string;needsReconciliation:boolean};
-type State = {draftId:string;conversationId?:string;canUndoClose?:boolean;tabs?:{id:string;title:string;busy:boolean;forking?:boolean;needsReconciliation:boolean}[];
+type State = {draftId:string;study?:boolean;conversationId?:string;canUndoClose?:boolean;tabs?:{id:string;title:string;busy:boolean;forking?:boolean;needsReconciliation:boolean}[];
   sourceMessages?:{id:string;title:string;conversation:string}[];busy:boolean;error?:string;status:string;provider:string;model:string;effort?:string;typeId:string;input:string;
   includeExamples:boolean;useQuestionTypeDefaults?:boolean;messages:Message[];total:number;hasSent?:boolean;models:Model[];types:{id:string;label:string;modelHint?:string}[];
   attachments:{sha256:string}[];cards:Card[];proposals:Proposal[];exportStatus:Record<string,string>;needsReconciliation:boolean;
   conversationBusy?:boolean;auxiliary?:Auxiliary;cardPreview?:{cardId:string;revision:number;front:string;back:string}};
-declare global { interface Window { chrome?: {webview:{postMessage:(v:unknown)=>void;addEventListener:(n:string,f:(e:{data:unknown})=>void)=>void;removeEventListener:(n:string,f:(e:{data:unknown})=>void)=>void}} } }
 const reportUiError = (error:unknown) => send('uiError',{message:error instanceof Error?error.message:String(error),stack:error instanceof Error?error.stack:''});
 window.addEventListener('error',event=>reportUiError(event.error??event.message));
 window.addEventListener('unhandledrejection',event=>reportUiError(event.reason));
@@ -33,7 +33,6 @@ class ChatErrorBoundary extends React.Component<React.PropsWithChildren, {failed
   componentDidCatch(error:Error){reportUiError(error);}
   render(){return this.state.failed?<main className="conversation" role="alert"><h1>问答界面暂时无法显示</h1><p>对话和输入保留在本机。重新加载后可继续查看；不会重新发送问题。</p><ActionButton onClick={()=>send('reloadView')}>重新加载界面</ActionButton></main>:this.props.children;}
 }
-const imageUrl = (sha:string) => `https://clipper-media.local/${sha}.png`;
 const math = createMathPlugin({singleDollarTextMath:true});
 const mermaid=createLazyMermaidPlugin({config:{securityLevel:'strict',suppressErrorRendering:true}});
 const markdownControls={code:false,table:false,image:false,mermaid:{download:false,copy:false,fullscreen:false,panZoom:false}};
@@ -48,7 +47,7 @@ const convert = (m:Message):ThreadMessageLike => ({id:m.id,role:m.role,createdAt
 const MarkdownTable = ({children}:any) => <div className="markdown-table-scroll" role="region" aria-label="表格" tabIndex={0}><table>{children}</table></div>;
 const PreviewMarkdown = ({text}:{text:string}) => <Streamdown mode="static" plugins={{math,cjk,mermaid}} controls={markdownControls}
   remarkRehypeOptions={{allowDangerousHtml:false}} urlTransform={url=>/^https:\/\/clipper-media\.local\/[a-f0-9]{64}\.png$/.test(url)?url:''}
-  components={{table:MarkdownTable,a:({children}:any)=><span>{children}</span>,img:({src,alt}:any)=>src?.startsWith('https://clipper-media.local/')?<img src={src} alt={alt||'卡片图片'}/>:null}}>{text}</Streamdown>;
+  components={{table:MarkdownTable,a:({children}:any)=><span>{children}</span>,img:({src,alt}:any)=>{const sha=/^https:\/\/clipper-media\.local\/([a-f0-9]{64})\.png$/.exec(src||'')?.[1];return sha?<img src={imageUrl(sha)} alt={alt||'卡片图片'}/>:null;}}}>{text}</Streamdown>;
 const Markdown = () => <StreamdownTextPrimitive plugins={{math,cjk,mermaid}} controls={markdownControls}
   components={{table:MarkdownTable,a:({children}:any)=><span>{children}</span>,img:()=>null}}
   remarkRehypeOptions={{allowDangerousHtml:false}} />;
@@ -139,7 +138,7 @@ function CardEditor({card,state,onIntegrate}:{card:Card;state:State;onIntegrate:
       <div className="auxiliary-settings" aria-label="辅助操作设置" aria-busy={auxiliary?.loading||auxiliary?.busy||false}
         data-state={auxiliary?.error?'error':auxiliary?.loading?'loading':auxiliaryModel?'success':'default'}>
         <label>服务<select aria-label="辅助服务" value={auxiliary?.provider||'api'} disabled={state.busy} onChange={e=>send('auxiliarySettings',{provider:e.target.value})}>
-          <option value="api">API</option><option value="codex">Codex</option></select></label>
+          <option value="api">API</option>{!state.study&&<option value="codex">Codex</option>}</select></label>
         <label>模型<select aria-label="辅助模型" title={auxiliaryModel?.name} value={auxiliary?.model||''} disabled={state.busy||auxiliary?.loading} onChange={e=>send('auxiliarySettings',{model:e.target.value})}>
           <option value="">{auxiliary?.loading?'加载中…':'选择模型'}</option>{auxiliary?.models.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
         <label>推理<select aria-label="辅助推理" value={auxiliary?.effort||''} disabled={state.busy||!auxiliaryModel?.efforts.length} onChange={e=>send('auxiliarySettings',{effort:e.target.value})}>
@@ -151,9 +150,10 @@ function CardEditor({card,state,onIntegrate}:{card:Card;state:State;onIntegrate:
       {auxiliary?.needsReconciliation&&auxiliary.provider==='codex'&&<ActionButton disabled={state.busy} onClick={()=>send('recoverAuxiliary')}>核对原辅助回合</ActionButton>}
     </div>
     {preview&&<section ref={previewElement} className="card-preview" aria-label="卡片预览"><h2>卡片预览</h2><h3>正面</h3><div className="message-body"><PreviewMarkdown text={preview.front}/></div><h3>背面</h3><div className="message-body"><PreviewMarkdown text={preview.back}/></div></section>}
-    <div className="export"><span role="status">{state.exportStatus[card.id]||'尚未导出'}</span>
+    <div className="export"><span role="status">{state.exportStatus[card.id]||(state.study?'草稿':'尚未导出')}</span>
+      {state.study?<ActionButton className="primary" disabled={state.busy||frozen} onClick={()=>send('export',{cardId:card.id,destination:'study'})}>保存到个人自由学习</ActionButton>:<>
       <ActionButton className="primary" disabled={state.busy} onClick={()=>send('export',{cardId:card.id,destination:'RemNote'})}>确认并导入 RemNote</ActionButton>
-      <ActionButton disabled={state.busy} onClick={()=>send('export',{cardId:card.id,destination:'Anki'})}>确认并导入 Anki</ActionButton></div>
+      <ActionButton disabled={state.busy} onClick={()=>send('export',{cardId:card.id,destination:'Anki'})}>确认并导入 Anki</ActionButton></>}</div>
   </div>;
 }
 
@@ -204,8 +204,8 @@ function App(){
       if(previous.draftId!==next.draftId||previous.conversationId!==next.conversationId||previous.input!==next.input)setInput(next.input);
       return next;
     });
-  };window.chrome?.webview.addEventListener('message',receive);send('ready');
-    return()=>window.chrome?.webview.removeEventListener('message',receive);},[]);
+  };const transport=host();transport?.addEventListener('message',receive);send('ready');
+    return()=>transport?.removeEventListener('message',receive);},[]);
   const card=state.cards.find(c=>c.id===active)||state.cards.at(-1);
   const currentModel=state.models.find(m=>m.id===state.model);
   const canSend=!state.busy&&!!currentModel&&!state.needsReconciliation&&!!(input.trim()||state.attachments.length);
@@ -232,7 +232,7 @@ function App(){
         <ActionButton className="new-conversation-tab" aria-label="新建对话 Tab" title="新建空白对话" onClick={()=>send('new')}>＋</ActionButton></div>
       <div id="conversation-panel" className="conversation-panel" role="tabpanel" aria-labelledby={`conversation-${state.conversationId||'main'}`}>
       <div className="selectors"><label>服务<select value={state.provider} disabled={state.busy||state.hasSent} onChange={e=>send('settings',{provider:e.target.value})}>
-        <option value="api">API</option><option value="codex">Codex · ChatGPT 登录</option></select></label>
+        <option value="api">API</option>{!state.study&&<option value="codex">Codex · ChatGPT 登录</option>}</select></label>
         <label>模型<select value={state.model} disabled={state.busy||(state.useQuestionTypeDefaults&&state.provider==='codex')} onChange={e=>send('settings',{model:e.target.value})}><option value="">选择模型</option>{state.models.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
         <label>推理<select value={state.effort||''} disabled={state.busy||!currentModel?.efforts.length||(state.useQuestionTypeDefaults&&state.provider==='codex')} onChange={e=>send('settings',{effort:e.target.value})}><option value="">默认</option>{currentModel?.efforts.map(e=><option key={e}>{e}</option>)}</select></label>
         <label>问题类型<select value={state.typeId} disabled={state.busy} onChange={e=>send('settings',{typeId:e.target.value})}>{state.types.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select></label>

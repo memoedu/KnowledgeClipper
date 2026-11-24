@@ -4,17 +4,18 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using KnowledgeClipper.Workflow;
 
 namespace KnowledgeClipper;
 
-internal enum SelectionDotAction { Read, Excerpt, Question, Ask }
-internal enum ClipboardImageDotAction { Image, Excerpt, Read, Question, Ask }
+internal enum SelectionDotAction { Read = (int)FloatingAction.Read, Excerpt = (int)FloatingAction.Excerpt, Question = (int)FloatingAction.Card, Ask = (int)FloatingAction.Ask }
+internal enum ClipboardImageDotAction { Image = (int)FloatingAction.Image, Excerpt = (int)FloatingAction.Excerpt, Read = (int)FloatingAction.Read, Question = (int)FloatingAction.Card, Ask = (int)FloatingAction.Ask }
 
 // Both floating surfaces keep their snapshot while hovered. Only uninterrupted
 // time outside the surface counts towards expiry; a new snapshot starts fresh.
 internal sealed class FloatingDotLifetime
 {
-    internal const int LeaveMilliseconds = 2000;
+    internal const int LeaveMilliseconds = FloatingWorkflow.LeaveMilliseconds;
     private bool hovered;
     private long expiresAt;
     internal void Start(long now) { hovered = false; expiresAt = now + LeaveMilliseconds; }
@@ -84,7 +85,7 @@ internal sealed class LanguageSelectionDot : Form
             if (value is not (SelectionDotAction.Read or SelectionDotAction.Excerpt))
                 throw new ArgumentOutOfRangeException(nameof(value));
             leftAction = value;
-            left.Text = value == SelectionDotAction.Read ? "读" : "摘";
+            left.Text = value == SelectionDotAction.Read ? FloatingWorkflow.Read.Label : FloatingWorkflow.Excerpt.Label;
             tip.SetToolTip(left, value == SelectionDotAction.Read ? "语言学习（是否朗读由设置决定）" : "摘录本次选区");
         }
     }
@@ -111,11 +112,11 @@ internal sealed class LanguageSelectionDot : Form
         AutoScaleMode = AutoScaleMode.None;
         BackColor = Color.FromArgb(231, 237, 245);
         ClientSize = new Size(imageMode ? 110 : 88, 23);
-        left = new CircleButton(imageMode ? "图" : "读", imageMode ? "image" : "read", Name + ".");
-        read = imageMode ? new CircleButton("读", "read", Name + ".") : null;
-        excerpt = new CircleButton("摘", "excerpt", Name + ".");
-        question = new CircleButton("卡", "question", Name + ".");
-        ask = new CircleButton("问", "ask", Name + ".");
+        left = new CircleButton(imageMode ? FloatingWorkflow.Image.Label : FloatingWorkflow.Read.Label, imageMode ? "image" : "read", Name + ".");
+        read = imageMode ? new CircleButton(FloatingWorkflow.Read.Label, "read", Name + ".") : null;
+        excerpt = new CircleButton(FloatingWorkflow.Excerpt.Label, "excerpt", Name + ".");
+        question = new CircleButton(FloatingWorkflow.Card.Label, "question", Name + ".");
+        ask = new CircleButton(FloatingWorkflow.Ask.Label, "ask", Name + ".");
         tip.SetToolTip(ask, "用默认 API 模型和快速问答直接提问");
         if (imageMode)
         {
@@ -226,13 +227,19 @@ internal sealed class LanguageSelectionDot : Form
     {
         if (left == null || excerpt == null || question == null || ask == null) return;
         var inset = Math.Max(1, (int)Math.Round(2.0 * DeviceDpi / 96));
-        var count = imageMode ? 5 : 4;
+        var entries = FloatingWorkflow.Entries(imageMode);
+        var count = entries.Count;
         var diameter = Math.Min(ClientSize.Height - 2 * inset, (ClientSize.Width - (count + 1) * inset) / count);
         if (diameter <= 0) return;
         var top = (ClientSize.Height - diameter) / 2;
-        var actions = imageMode ? new[] { left, read, question, excerpt, ask } : new[] { left, question, excerpt, ask };
-        for (var index = 0; index < actions.Length; index++)
-            actions[index].Bounds = new Rectangle(inset + index * (ClientSize.Width - 2 * inset - diameter) / (count - 1), top, diameter, diameter);
+        for (var index = 0; index < count; index++)
+        {
+            var control = entries[index].Action switch {
+                FloatingAction.Read => imageMode ? read : left, FloatingAction.Image => left,
+                FloatingAction.Card => question, FloatingAction.Excerpt => excerpt, _ => ask
+            };
+            control.Bounds = new Rectangle(inset + index * (ClientSize.Width - 2 * inset - diameter) / (count - 1), top, diameter, diameter);
+        }
     }
 
     private void ApplyDpiMetrics()

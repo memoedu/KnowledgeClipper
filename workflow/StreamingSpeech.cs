@@ -44,7 +44,8 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
     }
 
     public Task SpeakAsync(ClipDraft draft, bool replay, Action changed, Action<int>? playerStarted = null) =>
-        SpeakTextAsync(draft, draft.Original.SelectedText, SpeechPurpose.Selection, replay, changed, playerStarted);
+        SpeakTextAsync(draft, replay && draft.RecordedText != null ? draft.RecordedText : ReadingSpeech.Text(draft.Original, draft.Settings.ContextEnabled),
+            SpeechPurpose.Selection, replay, changed, playerStarted);
 
     // The caller resolves word/context eligibility. Playback preserves the source
     // recording's exact text, voice and synthesis settings without changing the new draft.
@@ -195,9 +196,13 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
             using var registration = token.Register(() => { try { if (!process.HasExited) process.Kill(true); }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { } });
             var stderr = process.StandardError.ReadToEndAsync();
-            var voice = SelectVoice(text, synthesisSettings);
-            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { text = SpokenText(text, synthesisSettings), voice,
-                style = SpeechStyle(text, synthesisSettings),
+            var voiceSettings = ReadingSpeech.VoiceSettings(text, synthesisSettings);
+            var voice = SelectVoice(text, voiceSettings);
+            var spoken = !reuse && ReadingSpeech.HasFormula(text) ? await ReadingSpeech.ReadFormulaTextAsync(text,synthesisSettings,token)
+                : SpokenText(text,voiceSettings);
+            if (purpose == SpeechPurpose.Selection) draft.RecordedText = text;
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { text = spoken, voice,
+                style = SpeechStyle(spoken, voiceSettings),
                 rate = synthesisSettings.RatePercent, volume = synthesisSettings.VolumePercent, pitch = synthesisSettings.PitchHz, ffplay = settings.FfplayPath,
                 audio = reuse ? cached : audio, replay = reuse, losslessReplay = true, preconnect = true,
                 play = replay || settings.SpeechAutoPlay || purpose == SpeechPurpose.Sentence }, WorkflowJson.Options).AsMemory(), token).ConfigureAwait(false);

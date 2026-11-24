@@ -267,6 +267,7 @@ public sealed class ClipDraft
     public string? ContentError { get; set; }
     public string? SpeechError { get; set; }
     public string? AudioPath { get; set; }
+    public string? RecordedText { get; set; }
     public SpeechAudioReference? ReusedSpeech { get; set; }
     public LanguageLookupResult? Lookup { get; set; }
     public string? LookupError { get; set; }

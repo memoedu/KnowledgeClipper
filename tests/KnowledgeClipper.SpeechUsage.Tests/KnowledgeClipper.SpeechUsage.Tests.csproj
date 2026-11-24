@@ -3,6 +3,9 @@
   <ItemGroup>
     <None Include="speech-fixture.py" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../workflow/StreamingSpeech.cs" Link="StreamingSpeech.cs" />
+    <Compile Include="../../workflow/ReadingSpeech.cs" Link="ReadingSpeech.cs" />
+    <Compile Include="../../workflow/SourceMath.cs" Link="SourceMath.cs" />
+    <PackageReference Include="Markdig" Version="1.4.0" />
     <Compile Include="../../workflow/SpeechVoiceCatalog.cs" Link="SpeechVoiceCatalog.cs" />
     <Compile Include="../../workflow/WindowsPlaybackMonitor.cs" Link="WindowsPlaybackMonitor.cs" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />

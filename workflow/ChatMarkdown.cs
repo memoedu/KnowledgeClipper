@@ -15,8 +15,8 @@ public sealed record ChatCopyMath(string Tex, string Markdown, bool Block);
 // A shared AST keeps code/escapes out of math parsing. Source messages are never normalized in place.
 public static class ChatMarkdown
 {
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseMathematics().UsePreciseSourceLocation().DisableHtml().Build();
-    private static readonly MarkdownPipeline CodeSpans = new MarkdownPipelineBuilder().UsePreciseSourceLocation().DisableHtml().Build();
+    private static MarkdownPipeline Pipeline => SourceMath.Pipeline;
+    private static MarkdownPipeline CodeSpans => SourceMath.CodeSpans;
     private sealed record Row(RemNoteRichPart[] Parts, int Parent, string? Html = null);
 
     public static void ValidateAssets(string markdown, IReadOnlyList<ImageAsset> assets) => Parse(markdown, assets);
@@ -331,23 +331,7 @@ public static class ChatMarkdown
 
     private static (string Text, int[] Map) NormalizeBrackets(string source)
     {
-        var ast = Markdown.Parse(source, CodeSpans);
-        var protectedSpans = ast.Descendants().Where(n => n is CodeInline or CodeBlock).Select(n => n.Span).ToArray();
-        bool Protected(int index) => protectedSpans.Any(s => index >= s.Start && index <= s.End);
-        var result = new StringBuilder(); var map = new List<int>();
-        void Append(string value, int index) { result.Append(value); map.AddRange(Enumerable.Repeat(index, value.Length)); }
-        for (var i = 0; i < source.Length; i++)
-        {
-            if (Protected(i) || source[i] != '\\' || i + 1 >= source.Length || source[i + 1] is not ('(' or '[') ||
-                i > 0 && source[i - 1] == '\\') { Append(source[i].ToString(), i); continue; }
-            var block = source[i + 1] == '['; var close = block ? "\\]" : "\\)";
-            var end = source.IndexOf(close, i + 2, StringComparison.Ordinal);
-            if (end < 0 || Protected(end)) { Append(source[i].ToString(), i); continue; }
-            Append(block ? "\n$$\n" : "$", i);
-            for (var position = i + 2; position < end; position++) Append(source[position].ToString(), position);
-            Append(block ? "\n$$\n" : "$", end + 1);
-            i = end + 1;
-        }
-        return (result.ToString(), map.ToArray());
+        var parsed = SourceMath.Normalize(source);
+        return (parsed.Text, parsed.Map);
     }
 }

@@ -154,15 +154,7 @@ internal sealed class LanguageDesktopCapture(string helper)
     internal static CaptureMaterial BuildMaterial(string text, WindowsContextSnapshot context, bool contextEnabled,
         string source, long window, DateTimeOffset capturedAt, bool retainLookupContext = false)
     {
-        var completed = LanguageSelectionBoundary.Complete(text, context?.Prefix, context?.Suffix);
-        var includeContext = contextEnabled && context != null;
-        var material = new CaptureMaterial(completed.Text,
-            includeContext ? completed.Prefix + completed.Text + completed.Suffix : null,
-            includeContext ? "source" : contextEnabled ? "unavailable" : "generated_allowed",
-            includeContext ? completed.Prefix.Length : null, source, window, capturedAt)
-        { LookupContextText = retainLookupContext && context != null ? completed.Prefix + completed.Text + completed.Suffix : null };
-        material.Validate();
-        return material;
+        return SelectionContext.Build(text, context?.Prefix, context?.Suffix, contextEnabled, source, window, capturedAt, retainLookupContext);
     }
 
     // No context, speech, content request or draft is created while merely selecting.

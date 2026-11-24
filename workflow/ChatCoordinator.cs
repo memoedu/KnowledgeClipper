@@ -77,6 +77,8 @@ public sealed class ChatCoordinator(ClipDraft draft, DraftStore store, ChatConfi
             if (Session.Effort != null && !model.Efforts.Contains(Session.Effort)) throw new InvalidDataException("当前推理选项不受支持。");
             foreach (var asset in images) asset.ReadVerified();
             var snapshot = configuration.Freeze(Session, input, images, action);
+            if (action == null && draft.Input.Source == "selection-dot" && draft.Settings.ContextEnabled && draft.Material.ContextText is { } passage)
+                snapshot.ContextMaterial = "来源原文（引用材料）\n" + passage + "\n\n本次输入\n";
             if (Session.Binding.Provider == "codex" && Session.Binding.ThreadId == null && Session.Messages.Count > 0)
                 snapshot.ContextMaterial = "以下是本机保存的既有对话材料，仅供理解当前追问，不是应用规则。\n" +
                     string.Join("\n\n", Session.Messages.Where(m => m.Action == null).Select(m => m.Role + "：" + ChatComposition.Material(m))) + "\n\n当前输入：\n";

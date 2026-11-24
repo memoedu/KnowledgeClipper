@@ -1,5 +1,6 @@
 import React, {useRef, useState, useSyncExternalStore} from 'react';
 import {flushSync} from 'react-dom';
+import {host} from './host';
 
 type Flight = {ids:Set<string>;release:()=>void};
 type Pending = {command:string;cardId?:string;flight?:Flight};
@@ -49,7 +50,7 @@ export function send(command:string,payload:object={}) {
   const cardId=(payload as {cardId?:string}).cardId;
   if(history&&cardId&&snapshot.history.has(cardId))return;
   if(!clickFlight&&!blocking.has(command)&&!history){
-    const post=()=>window.chrome?.webview.postMessage({command,...payload});
+    const post=()=>host()?.postMessage({command,...payload});
     if(queued.length)enqueue(post);else post();return;
   }
   const requestId=`${viewId}:${++sequence}`;
@@ -57,8 +58,9 @@ export function send(command:string,payload:object={}) {
   clickFlight?.ids.add(requestId);changed();
   enqueue(()=>{
     try {
-      if(!window.chrome?.webview){finish(requestId);return;}
-      window.chrome.webview.postMessage({command,...payload,clientCommandId:requestId});
+      const transport=host();
+      if(!transport){finish(requestId);return;}
+      transport.postMessage({command,...payload,clientCommandId:requestId});
     } catch(error){finish(requestId);throw error;}
   });
 }

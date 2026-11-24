@@ -1,0 +1,10 @@
+{
+  "tag": "mathcat-0.7.8-clipper.1",
+  "rust": "1.100.0",
+  "wasm-bindgen": "0.2.130",
+  "files": {
+    "mathcat.js": "ce8f7700b31bbc853a03c38097ea2312f69a664a6f5c5c24b2afd42fcf0ee95b",
+    "mathcat_bg.wasm": "47896f758ec950e7890ad097e02ab4a1faf524dbb6a5a5aa207674082ff6f288",
+    "mathcat-NOTICES.txt": "e26bc19fd26f0642be2896419cda36e0ee8f668d7dc84785936b7e4eb7b77022"
+  }
+}
