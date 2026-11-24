@@ -7,6 +7,7 @@ import { cjk } from '@streamdown/cjk';
 import {createLazyMermaidPlugin} from './lazy-mermaid';
 import { Streamdown } from 'streamdown';
 import 'katex/dist/katex.min.css';
+import './material.css';
 import './style.css';
 import {copySelection,pasteImages,type CopyMath} from './clipboard';
 import {SupplementalRequirements,composeRequirements,type RequirementOption} from './SupplementalRequirements';

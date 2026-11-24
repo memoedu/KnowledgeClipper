@@ -19,6 +19,7 @@ export function displayMarkdown(text:string){
       inline!==undefined?'$'+inline+'$':digest?alt+'(https://clipper-media.local/'+digest+'.png)':source);
 }
 export function renderMaterial(element:HTMLElement,text:string,image:(digest:string)=>string=()=>''){
+  element.classList.add('message-body','clipperMaterial');
   let root=mounted.get(element);if(!root){root=createRoot(element);mounted.set(element,root);}
   root.render(<Streamdown mode="static" plugins={{math,cjk}} controls={false} remarkRehypeOptions={{allowDangerousHtml:false}}
     urlTransform={url=>media.test(url)?url:''}

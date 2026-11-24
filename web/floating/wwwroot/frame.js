@@ -96,7 +96,9 @@ function picture(sha){const el=node('img');el.alt=tx('剪藏图片','Clipped ima
 function render(state){
   const s=state.shared, nodes=[];
   if(s.screen!=='images'){
-    const quote=node('blockquote');quote.append(material(s.text));nodes.push(quote);
+    if(s.screen!=='excerpt'||!state.cards.some(card=>!card.supersededBy&&card.front===s.text)){
+      const quote=node('blockquote');quote.append(material(s.text));nodes.push(quote);
+    }
     if(s.context){const ctx=node('details');ctx.append(node('summary',s.scope==='paragraph'?tx('来源段落','Source paragraph'):tx('来源句子','Source sentence')),material(s.context));nodes.push(ctx);}
   }
   if(s.screen==='language'){

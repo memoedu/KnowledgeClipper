@@ -15,21 +15,31 @@ STATIC = {'.js', '.mjs', '.json', '.wasm', '.dat', '.css', '.html', '.txt', '.wo
 
 def build(browser, chat, output):
     entries = {}
+    graph = json.loads((chat / '.vite/manifest.json').read_bytes())
+    chat_assets = {'index.html', 'mermaid-runtime.js', 'math-reader.mjs', 'THIRD-PARTY-NOTICES.txt'}
+    for chunk in graph.values():
+        chat_assets.add(chunk['file'])
+        chat_assets.update(chunk.get('assets', []))
+        chat_assets.update(chunk.get('css', []))
     for base, prefix in ((browser, ''), (chat, 'chat/')):
         for file in sorted(base.rglob('*')):
             name = file.relative_to(base).as_posix()
             if not file.is_file() or 'math' in file.relative_to(base).parts or file.suffix not in STATIC:
                 continue
+            if base == chat and name not in chat_assets:
+                continue
             if file.is_symlink() or name.startswith('.') or any(part.startswith('.') for part in file.relative_to(base).parts):
                 raise ValueError('Unexpected browser artifact: ' + name)
             entries[prefix + name] = file.read_bytes()
+    if any('chat/' + name not in entries for name in chat_assets):
+        raise ValueError('Incomplete chat distribution graph.')
     for required in ('index.html', 'frame.js', '_framework/blazor.boot.json', 'chat/index.html', 'chat/material.js',
                      'chat/math-reader.mjs', 'chat/THIRD-PARTY-NOTICES.txt'):
         if required not in entries:
             raise ValueError('Missing browser artifact: ' + required)
-    katex, = chat.glob('assets/katex-*.css')
-    entries['material.css'] = ('@import "./chat/assets/' + katex.name + '";\n'
-        'img{max-width:100%;height:auto}pre,.katex-display{overflow-x:auto}pre{white-space:pre}\n').encode()
+    katex, = (Path(name) for name in chat_assets if name.startswith('assets/katex-') and name.endswith('.css'))
+    shared_css = Path(__file__).resolve().parents[1] / 'web/chat/src/material.css'
+    entries['material.css'] = ('@import "./chat/assets/' + katex.name + '";\n').encode() + shared_css.read_bytes().replace(b'\r\n', b'\n')
     nuget = os.environ.get('NUGET_PACKAGES')
     if not nuget:
         nuget = subprocess.check_output(['dotnet', 'nuget', 'locals', 'global-packages', '--list'], text=True).split(': ', 1)[1].strip()
