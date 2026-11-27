@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 describe('standalone plugin identity migration',()=>{
+  it('rejects a missing pinned root in another library before any journal or card write',async()=>{
+    const sdk=fakeSdk(),adapter=new KnowledgeClipperAdapter(sdk.plugin,()=>true);
+    const p={...plan(),rootRemId:'root-in-selected-library'};
+    const other=(await sdk.plugin.rem.createRem())!;
+    await other.setText([p.rootTitle]);
+    await other.setIsDocument(true);
+    const writes=sdk.writes;
+    await expect(adapter.export({plan:p,newSource:true})).resolves.toMatchObject({notStarted:true});
+    expect(sdk.nodes.size).toBe(1);
+    expect(sdk.storage.size).toBe(0);
+    expect(sdk.writes).toBe(writes);
+  });
   it('blocks unknown source without explicit new-source authorization',async()=>{
     const sdk=fakeSdk(),adapter=new KnowledgeClipperAdapter(sdk.plugin,()=>true);
     await expect(adapter.export(plan())).rejects.toThrow('Unregistered source');
