@@ -69,7 +69,7 @@ internal sealed record LegacyAttemptPackage(
     string CancelPath,
     LegacyWorkerRequest Request);
 
-internal sealed record WorkerProcessInvocationResult(int ExitCode, bool TimedOut, bool Cancelled, string StandardErrorPath);
+internal sealed record WorkerProcessInvocationResult(int ExitCode, bool TimedOut, bool Cancelled, string StandardErrorPath, string? Transport = null);
 internal sealed record PublicWorkerCommandPackage(string Command, string RequestPath, string StandardOutputPath, string StandardErrorPath);
 
 internal interface IWorkerProcessInvoker
