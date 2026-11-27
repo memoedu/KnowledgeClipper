@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\KnowledgeClipper.Core.V3.Contracts\KnowledgeClipper.Core.V3.Contracts.csproj" />
+    <None Update="WorkerAdapter\remote-content.py" Link="remote-content.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <InternalsVisibleTo Include="KnowledgeClipper.Core.V3.FoundationTests" />
     <InternalsVisibleTo Include="KnowledgeClipper.Core.V3.Host" />
     <InternalsVisibleTo Include="KnowledgeClipper.Core.V3.Phase2Tests" />

@@ -23,6 +23,7 @@ if (args.Length == 2 && args[0] == "--destinations-fake-host-smoke") return awai
 if (args.Length == 2 && args[0] == "--playback-fake-child") return await PlaybackControlTests.ChildAsync(args[1]);
 if (args.Length == 2 && args[0] == "--playback-control-self-test") return await PlaybackControlTests.RunAsync(args[1]);
 if (args.Length == 4 && args[0] == "--playback-bundle-probe") return await PlaybackControlTests.BundleProbeAsync(args[1], args[2], args[3]);
+if (args.Length == 4 && args[0] == "--content-ssh-canary") return await ContentSshCanary.RunAsync(args[1], args[2], args[3]);
 var repositoryRoot = FindRepositoryRoot(AppContext.BaseDirectory);
 if (args.Length == 2 && args[0] == "--language-resume-core-self-test")
 {

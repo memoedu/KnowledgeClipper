@@ -33,6 +33,18 @@ internal sealed class SystemWorkerProcessInvoker : IWorkerProcessInvoker
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        if (worker.WorkerId == "content.deepseek")
+        {
+            if (Environment.GetEnvironmentVariable("KC_CONTENT_SSH_CONFIG") is { Length: > 0 } configuration)
+                return await SshContentProcessInvoker.InvokeAsync(worker, package, configuration, timeout, cancellationToken).ConfigureAwait(false);
+            var attemptDirectory = Path.GetDirectoryName(package.RequestPath)!;
+            if (File.Exists(Path.Combine(attemptDirectory, "content-ssh-reservation.json")))
+            {
+                if (!File.Exists(package.ResultPath)) throw SshContentProcessInvoker.OutcomeUnknown();
+                return new(0, false, false, Path.Combine(attemptDirectory, "stderr.log"), "ssh");
+            }
+        }
+
         var stderrPath = Path.Combine(Path.GetDirectoryName(package.RequestPath)!, "stderr.log");
         var stdoutPath = Path.Combine(Path.GetDirectoryName(package.RequestPath)!, "stdout.log");
         using var process = new Process

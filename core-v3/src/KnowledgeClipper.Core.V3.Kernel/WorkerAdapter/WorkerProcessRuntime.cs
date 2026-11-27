@@ -170,26 +170,40 @@ internal sealed partial class WorkerProcessRuntime : IWorkerRuntime
         WorkerProcessInvocationResult process,
         CancellationToken cancellationToken)
     {
-        var entrypointBytes = await File.ReadAllBytesAsync(worker.Entrypoint, cancellationToken).ConfigureAwait(false);
-        var relativeEntrypoint = Path.GetRelativePath(_repositoryRoot, worker.Entrypoint).Replace('\\', '/');
-        Require(!relativeEntrypoint.StartsWith("../", StringComparison.Ordinal) && !Path.IsPathRooted(relativeEntrypoint),
-            "Started worker entrypoint is outside the sealed candidate root.");
-        var evidence = StrictJson.CloneElement(new
-        {
-            schema = "kc.worker-execution-evidence/1",
-            request = new { package.Request.OperationId, package.Request.TaskId, package.Request.RunId, package.Request.StageId, package.Request.AttemptId, package.Request.WorkerId, package.Request.Operation },
-            startedEntrypoint = new
+        var request = new { package.Request.OperationId, package.Request.TaskId, package.Request.RunId,
+            package.Request.StageId, package.Request.AttemptId, package.Request.WorkerId, package.Request.Operation };
+        var status = new { process.ExitCode, process.TimedOut, process.Cancelled,
+            standardErrorPath = Path.GetRelativePath(package.JobRoot, process.StandardErrorPath).Replace('\\', '/') };
+        object evidence;
+        if (process.Transport == "ssh")
+            evidence = new
             {
-                candidateRelativePath = relativeEntrypoint,
-                bytes = entrypointBytes.LongLength,
-                sha256 = Convert.ToHexString(SHA256.HashData(entrypointBytes)),
-                workerId = worker.WorkerId,
-                workerVersion = worker.WorkerVersion,
-                contractVersion = worker.ContractVersion,
-                describeVerifiedAtAdmission = true
-            },
-            process = new { process.ExitCode, process.TimedOut, process.Cancelled, standardErrorPath = Path.GetRelativePath(package.JobRoot, process.StandardErrorPath).Replace('\\', '/') }
-        });
+                schema = "kc.remote-content-execution-evidence/1", request, process = status, transport = "ssh",
+                admittedWorker = new { worker.WorkerId, worker.WorkerVersion, worker.ContractVersion }
+            };
+        else
+        {
+            var entrypointBytes = await File.ReadAllBytesAsync(worker.Entrypoint, cancellationToken).ConfigureAwait(false);
+            var relativeEntrypoint = Path.GetRelativePath(_repositoryRoot, worker.Entrypoint).Replace('\\', '/');
+            Require(!relativeEntrypoint.StartsWith("../", StringComparison.Ordinal) && !Path.IsPathRooted(relativeEntrypoint),
+                "Started worker entrypoint is outside the sealed candidate root.");
+            evidence = new
+            {
+                schema = "kc.worker-execution-evidence/1",
+                request,
+                startedEntrypoint = new
+                {
+                    candidateRelativePath = relativeEntrypoint,
+                    bytes = entrypointBytes.LongLength,
+                    sha256 = Convert.ToHexString(SHA256.HashData(entrypointBytes)),
+                    workerId = worker.WorkerId,
+                    workerVersion = worker.WorkerVersion,
+                    contractVersion = worker.ContractVersion,
+                    describeVerifiedAtAdmission = true
+                },
+                process = status
+            };
+        }
         var path = Path.Combine(Path.GetDirectoryName(package.RequestPath)!, "worker-execution.evidence.v1.json");
         var bytes = JsonSerializer.SerializeToUtf8Bytes(evidence, KernelJson.Options);
         await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough | FileOptions.Asynchronous);

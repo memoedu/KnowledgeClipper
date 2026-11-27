@@ -46,6 +46,14 @@ node .\dist\src\cli.js run --request <absolute-existing-request.json>
 - `user_stop`、`superseded`、`task_cancel` 映射 `cancelled`；`timeout` 映射可重试 `failed`；失败与取消不发布 output refs。
 - DeepSeek 配置依次从当前进程、Windows 用户环境变量、`AI_PRODUCER_CONFIG_FILE` 或 `Documents\New project\DeepSeek API 配置.md` 发现，密钥不进入 Bundle、日志或回执。
 
+### 自有 Mac 执行 Core Content 尝试
+
+Core 的 `SystemWorkerProcessInvoker` 可为 `content.deepseek` 使用固定主机密钥核验的 OpenSSH。已使用 Core 提供内容处理的安装可给原 Windows Core 进程设置 `KC_CONTENT_SSH_CONFIG` 为本机 JSON 的绝对路径。字段为 `python`（Windows Python 可执行文件绝对路径）、`host`（OpenSSH 主机别名）、`remotePython`、`remoteHelper`、`remoteConfig`（Mac 上的绝对路径）和 `model`（`deepseek-chat` 或 `deepseek-reasoner`）。
+
+Mac 安装与 Windows Core 权威登记相同版本的本 Worker，部署 Kernel 源码中的 `WorkerAdapter/remote-content.py`。Mac JSON 字段为 `node`、`worker`（实际构建的 CLI）、`spool`（仅专用 Mac 用户可读写的目录）和相同 `model`。真调用的 `DEEPSEEK_KNOWLEDGECLIPPER_API_KEY` 由 Mac 本机凭据配置提供给工作进程。Content Worker 仍走原合同，审批和导出留 Windows。Windows 原尝试包只传输入清单及哈希验证后的内容。
+
+两端在执行前为同一请求保留记录。SSH 超时、失联或回执验证失败时保留未知状态。受控重试只可读取同一远端结果；本机已有完整结果时复用本机文件。可用同一个 `remote-content.py recover <Windows 配置> <原 Job 根> <原请求文件> <Worker 版本> <秒>` 回读。停止新任务使用远端时，从原 Core 进程环境移除配置；已预约的未知尝试保持待核对。
+
 ## 构建、回归与 Canary
 
 ```powershell
