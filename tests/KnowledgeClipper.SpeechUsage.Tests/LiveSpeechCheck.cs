@@ -19,9 +19,9 @@ internal static class LiveSpeechCheck
             File.AppendAllText(Path.Combine(root, "attempts.jsonl"), JsonSerializer.Serialize(new { observedAt = DateTimeOffset.UtcNow, stage = "voice_discovery", error = ex.Message }) + Environment.NewLine);
             throw;
         }
-        var english = voices.First(v => v.Id == defaults.EnglishVoice);
-        var alternate = voices.First(v => v.Locale == "en-US" && v.Id != english.Id);
-        var chinese = voices.First(v => v.Id == defaults.Voice);
+        var english = SpeechVoiceCatalog.EnglishVoices.FirstOrDefault(v => v.Id == defaults.EnglishVoice) ?? SpeechVoiceCatalog.EnglishVoices[0];
+        var alternate = SpeechVoiceCatalog.EnglishVoices.First(v => v.Id != english.Id);
+        var chinese = voices.First(v => v.Id == SpeechVoiceCatalog.NormalizeVoiceId(defaults.Voice));
         var settings = defaults with { FfplayPath = ffplay, EnglishVoice = english.Id, Voice = chinese.Id };
         var draft = new ClipDraft { Id = Guid.NewGuid().ToString("N"), Original = new("apple"), Settings = settings };
         using var speech = new StreamingSpeech(helper, root);
@@ -70,7 +70,7 @@ internal static class LiveSpeechCheck
             Console.WriteLine($"LIVE {name}: synthesis/playback={valid}, observed unmuted stream={outputSeen}, bytes={bytes}");
         }
         void Save() => File.WriteAllText(Path.Combine(root, caseFilter == null ? "report.json" : $"report-{caseFilter}.json"), JsonSerializer.Serialize(new {
-            observedAt = DateTimeOffset.UtcNow, provider = "existing edge_tts", helper,
+            observedAt = DateTimeOffset.UtcNow, models = new { english = "gpt-realtime-2.1-mini", mandarin = "mimo-v2.5-tts" }, helper,
             settings.PythonPath, settings.FfplayPath, english, alternate, chinese,
             evidenceBoundary = "Production StreamingSpeech and WindowsPlaybackMonitor linked into isolated DTO harness. No fixture in live path. Metering proves process output, not physical audibility. Mixed Chinese skipping and perceived voice identity have not been verified by listening.",
             reports, completedChecks = checks.Count, passedChecks = checks.Count(v => v)

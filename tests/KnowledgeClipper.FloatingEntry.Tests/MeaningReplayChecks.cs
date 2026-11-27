@@ -48,7 +48,11 @@ internal static partial class Program
             JsonElement[] Requests() => File.ReadAllLines(log).Select(s => JsonDocument.Parse(s).RootElement.Clone()).ToArray();
             await Until(() => Count() == 1, scenario + ": initial playback reaches helper");
             Check(Requests()[0].GetProperty("losslessReplay").GetBoolean(), scenario + ": requests lossless replay transport");
-            Check(Requests()[0].GetProperty("preconnect").GetBoolean(), scenario + ": first reading enables the prepared transport");
+            var firstRequest = Requests()[0];
+            Check(scenario == "reused"
+                ? !firstRequest.TryGetProperty("provider", out var providerField) || providerField.ValueKind == JsonValueKind.Null
+                : firstRequest.GetProperty("provider").GetString() == "openai",
+                scenario + ": new English audio selects OpenAI and historical replay selects no provider");
             if (scenario is "early" or "hidden" or "superseded")
             {
                 Click(); Click(); await Task.Delay(150);

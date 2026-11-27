@@ -105,12 +105,17 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
     }
 
     public static string SpeechStyle(string text, LanguageSettings settings)
+        => SpeechStyleForSpokenText(SpokenText(text, settings));
+
+    internal static string ProviderForSpokenText(string spoken) => ContainsHan(spoken) ? "mimo" : "openai";
+
+    private static bool ContainsHan(string text) => text.EnumerateRunes().Any(r => r.Value is >= 0x3400 and <= 0x9FFF or
+        >= 0xF900 and <= 0xFAFF or >= 0x20000 and <= 0x2FA1F or >= 0x30000 and <= 0x3347F);
+
+    private static string SpeechStyleForSpokenText(string spoken)
     {
-        var spoken = SpokenText(text, settings);
         var english = spoken.Any(c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z');
-        var chinese = spoken.EnumerateRunes().Any(r => r.Value is >= 0x3400 and <= 0x9FFF or
-            >= 0xF900 and <= 0xFAFF or >= 0x20000 and <= 0x2FA1F or >= 0x30000 and <= 0x3347F);
-        if (chinese)
+        if (ContainsHan(spoken))
             return "自然、平稳地完整朗读原文，使用标准普通话、正常语速和自然的轻重音、连读与标点停顿。" +
                 (english ? "英文部分使用自然的美式英语，按原文顺序切换语言。" : "") +
                 "词语或短语只正常读一遍；不逐字顿读，不添加解释、语气词、笑声或表演。";
@@ -120,9 +125,13 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
             "Read verbatim without explanations, extra words or performed emotions and sound effects.";
     }
 
-    // New synthesis includes its reading instructions in the identity. Explicit replay
-    // also accepts the old identity, so upgrading never regenerates saved recordings.
+    // The routing version binds both models and the exact source/settings, including
+    // math source text. Reading history can validate the key without rendering math.
     public static string AudioCacheKey(string text, SpeechPurpose purpose, LanguageSettings settings) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("mandarin-mimo-v2.5-tts_english-gpt-realtime-2.1-mini_v2\n" +
+            GuidedAudioCacheKey(text, purpose, settings)))).ToLowerInvariant();
+
+    internal static string GuidedAudioCacheKey(string text, SpeechPurpose purpose, LanguageSettings settings) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("natural-reading-v1\n" +
             LegacyAudioCacheKey(text, purpose, settings) + "\n" + SpeechStyle(text, settings)))).ToLowerInvariant();
 
@@ -133,6 +142,7 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
 
     public static bool MatchesAudioCacheKey(string path, string text, SpeechPurpose purpose, LanguageSettings settings) =>
         Path.GetFileName(path).EndsWith("-" + AudioCacheKey(text, purpose, settings) + ".mp3", StringComparison.OrdinalIgnoreCase) ||
+        Path.GetFileName(path).EndsWith("-" + GuidedAudioCacheKey(text, purpose, settings) + ".mp3", StringComparison.OrdinalIgnoreCase) ||
         Path.GetFileName(path).EndsWith("-" + LegacyAudioCacheKey(text, purpose, settings) + ".mp3", StringComparison.OrdinalIgnoreCase);
 
     public Task SpeakTextAsync(ClipDraft draft, string text, SpeechPurpose purpose, bool replay, Action changed, Action<int>? playerStarted = null) =>
@@ -168,8 +178,10 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
             var cached = recording?.Path ?? Path.Combine(audioRoot, draft.Id + "-" + cacheKey + ".mp3");
             if (recording == null && replay && !File.Exists(cached))
             {
+                var guided = Path.Combine(audioRoot, draft.Id + "-" + GuidedAudioCacheKey(text, purpose, synthesisSettings) + ".mp3");
                 var legacy = Path.Combine(audioRoot, draft.Id + "-" + LegacyAudioCacheKey(text, purpose, synthesisSettings) + ".mp3");
-                if (File.Exists(legacy)) cached = legacy;
+                if (File.Exists(guided)) cached = guided;
+                else if (File.Exists(legacy)) cached = legacy;
             }
             // Unique partial paths prevent a cancelled request from deleting the next request's stream.
             var audio = Path.Combine(audioRoot, draft.Id + "-" + Guid.NewGuid().ToString("N") + ".mp3");
@@ -202,9 +214,9 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
                 : SpokenText(text,voiceSettings);
             if (purpose == SpeechPurpose.Selection) draft.RecordedText = text;
             await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { text = spoken, voice,
-                style = SpeechStyle(spoken, voiceSettings),
+                provider = reuse ? null : ProviderForSpokenText(spoken), style = SpeechStyleForSpokenText(spoken),
                 rate = synthesisSettings.RatePercent, volume = synthesisSettings.VolumePercent, pitch = synthesisSettings.PitchHz, ffplay = settings.FfplayPath,
-                audio = reuse ? cached : audio, replay = reuse, losslessReplay = true, preconnect = true,
+                audio = reuse ? cached : audio, replay = reuse, losslessReplay = true,
                 play = replay || settings.SpeechAutoPlay || purpose == SpeechPurpose.Sentence }, WorkflowJson.Options).AsMemory(), token).ConfigureAwait(false);
             process.StandardInput.Close();
             // Send the current request before starting the next idle helper.
@@ -306,7 +318,7 @@ public sealed class StreamingSpeech(string helperPath, string audioRoot) : IDisp
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardInputEncoding = new UTF8Encoding(false), StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         info.ArgumentList.Add("-u"); info.ArgumentList.Add(helperPath);
-        if (warm) { info.ArgumentList.Add("--prepare"); info.ArgumentList.Add("--preconnect"); }
+        if (warm) info.ArgumentList.Add("--prepare");
         var process = Process.Start(info) ?? throw new InvalidOperationException("无法启动朗读组件。");
         return new(process, settings.PythonPath, warm ? ReadReadyAsync(process) : null, Stopwatch.GetTimestamp());
     }

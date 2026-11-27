@@ -45,8 +45,8 @@ internal static class DeckSettingsChecks
             Find<CheckBox>(dialog, "show-dictionary-preview").Checked = true;
             Find<CheckBox>(dialog, "auto-read").Checked = false;
             var englishVoice = Find<ComboBox>(dialog, "english-voice");
-            var voiceOption = new SpeechVoiceOption("en-US-AnaNeural", "en-US", "Female");
-            englishVoice.Items.Add(voiceOption); englishVoice.SelectedItem = voiceOption;
+            Check(englishVoice.SelectedItem is SpeechVoiceOption { Id: "marin" }, "legacy English voice resolves to the existing OpenAI default");
+            englishVoice.SelectedItem = englishVoice.Items.Cast<SpeechVoiceOption>().Single(v => v.Id == "cedar");
             Find<ComboBox>(dialog, "deck").Text = "KnowledgeClipper UI Fixture";
             var modes = Find<ComboBox>(dialog, "mode");
             var page = modes.Parent; while (page is not TabPage) page = page!.Parent;
@@ -79,7 +79,7 @@ internal static class DeckSettingsChecks
             Check(dialog.IsDisposed, "valid root and all mode paths save in one action");
         }
         var saved = WorkflowJson.Read<LanguageSettings>(settingsPath);
-        Check(!saved.LanguageAutoRead && saved.EnglishVoice == "en-US-AnaNeural", "language speech preference and voice ID persist without the display label");
+        Check(!saved.LanguageAutoRead && saved.EnglishVoice == "cedar", "language speech preference and voice ID persist without the display label");
         Check(saved.ShowDictionaryInPreview, "dictionary preview setting persists independently of the card field");
         Check(saved.AnkiRootDeck == "KnowledgeClipper UI Fixture" && saved.AnkiDeck == saved.AnkiRootDeck, "root persists and synchronizes the legacy deck value");
         var updated = ModeConfigurationLoader.Load(Path.Combine(projectRoot, "modes"), overrides);
