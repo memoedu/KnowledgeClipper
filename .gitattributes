@@ -1,2 +1,5 @@
 # Preserve the immutable, byte-verified contract checkpoint on every checkout.
 contracts/v1/checkpoints/contracts-v1-stable-checkpoint-20260825T115938Z.json -text
+
+# Fixture manifests verify exact byte hashes and include whitespace-sensitive inputs.
+content-worker/fixtures/** text=auto eol=lf

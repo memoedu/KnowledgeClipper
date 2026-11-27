@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
   const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
   const projectRoot = path.dirname(workerRoot);
-  const checkpointPath = path.join(projectRoot, "receipts", "contracts-v1-stable-checkpoint-20260825T115938Z.json");
+  const checkpointPath = path.join(projectRoot, "contracts", "v1", "checkpoints", "contracts-v1-stable-checkpoint-20260825T115938Z.json");
   const checkpointDigest = await fileDigest(checkpointPath);
   if (checkpointDigest.sha256 !== CHECKPOINT_SHA256) throw new Error(`CHECKPOINT_MISMATCH ${checkpointDigest.sha256}`);
   const sourceRoot = path.join(workerRoot, "fixtures", args.fixture);
