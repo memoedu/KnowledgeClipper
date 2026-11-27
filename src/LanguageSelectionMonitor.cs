@@ -23,6 +23,7 @@ internal sealed class LanguageSelectionMonitor : IDisposable
     private readonly SelectionGestureTracker gestures = new();
     private readonly SelectionWatchState state = new();
     private Func<bool> leftButtonDown = () => LanguageDesktopCapture.LeftButtonDown;
+    private readonly Func<long> readForeground = () => LanguageDesktopCapture.Foreground;
     private LanguageDesktopCapture.CaptureInputMonitor input;
     private System.Threading.Timer timer;
     private CancellationTokenSource lifetime, reading;
@@ -118,7 +119,7 @@ internal sealed class LanguageSelectionMonitor : IDisposable
         lock (gate)
         {
             if (!running) return false;
-            var window = LanguageDesktopCapture.Foreground;
+            var window = readForeground();
             var now = Environment.TickCount64;
             state.ObservePointer(isDotPoint(LanguageDesktopCapture.CursorPosition), now);
             if (!state.TryConsume(snapshot, window, LanguageDesktopCapture.WindowProcessId(window), now)) return false;

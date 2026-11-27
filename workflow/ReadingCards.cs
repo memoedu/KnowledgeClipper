@@ -3,7 +3,8 @@ namespace KnowledgeClipper.Workflow;
 public static class ReadingCards
 {
     public static async Task Prepare(ClipDraft draft, ClipDraft[] children, DraftStore store, ContentModule content,
-        HttpClient http, CancellationToken cancellation, Action changed, Action<ClipDraft>? refresh = null)
+        HttpClient http, CancellationToken cancellation, Action changed, Action<ClipDraft>? refresh = null,
+        Func<ClipDraft, FrozenContentSender?>? sender = null)
     {
         var dictionaryTasks = children.Where(child => child.ConfirmedNote == null &&
             (child.DictionaryDetails == null || child.DictionaryDetails.Target != child.Material.SelectedText.Trim() ||
@@ -41,7 +42,8 @@ public static class ReadingCards
                     { ExampleSentence = example.Value.Sentence, ExampleSource = example.Value.Source };
                     store.Save(child);
                 }
-                child.Content = await content.ProcessAsync(child.Material, child.ModeId!, child.Configuration, child.Settings, cancellation);
+                child.Content = await content.ProcessAsync(child.Material, child.ModeId!, child.Configuration, child.Settings, cancellation,
+                    sender: sender?.Invoke(child));
                 if (dictionaryTask != null) child.DictionaryDetails = await dictionaryTask;
                 child.EditedFields = null;
                 child.Times["previewReady"] = DateTimeOffset.UtcNow;
