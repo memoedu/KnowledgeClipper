@@ -13,6 +13,11 @@ public sealed record SpeechVoiceOption(string Id, string Locale, string Gender)
 
 public static class SpeechVoiceCatalog
 {
+    public static IReadOnlyList<SpeechVoiceOption> EnglishVoices { get; } = Array.AsReadOnly(new SpeechVoiceOption[]
+    {
+        new("marin", "en-US", "Female"), new("cedar", "en-US", "Male")
+    });
+
     public static string NormalizeVoiceId(string voice)
     {
         if (voice.StartsWith("mimo-", StringComparison.Ordinal)) return voice[5..];

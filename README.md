@@ -63,6 +63,8 @@ GraspMemoEdu 复用 `workflow` 中的浮点路由、选区、语言卡、摘录�
 
 选择一句或一段上下文时，公式按完整的数学内容保留。来源带有公式时，朗读使用同一段文字的数学读法。卡片和摘录保留可编辑的 LaTeX。公式朗读按需加载 KaTeX 和 MathCAT 的中英文规则。桌面用 Node 调用相同模块。
 
+桌面和网站的站点语音均按最终读出的文字分流。中文用 MiMo `mimo-v2.5-tts`，英文用 OpenAI `gpt-realtime-2.1-mini`。桌面音色、历史录音兼容和真实模型验证见[中英文朗读](docs/pronunciation.md)。
+
 桌面构建继续使用 `build.ps1`。它按 `web/math-speech/runtime-lock.json` 校验数学朗读运行文件。离线构建可用 `KC_MATH_MODULE_DIR` 指定已下载的同版本模块。使用锁定的 Rust 和 wasm-bindgen，在已安装 `wasm32-unknown-unknown` 目标的平台可执行 `python tools/math_runtime.py <输出目录> --build <编译缓存目录>` 从源重建。
 
 网站发布时先构建 `web/chat`，再执行 `dotnet publish web/floating/KnowledgeClipper.Browser.csproj -c Release -o <发布目录>`。用 `python tools/package_floating.py <发布目录>/wwwroot <聊天构建输出> <输出目录>/knowledge-clipper-web.zip` 打包。使用 `dotnet run --project tools/ExportFloatingCatalog -c Release -- modes <输出目录>/clipper_catalog.json` 生成同一提交的设置与模式清单。

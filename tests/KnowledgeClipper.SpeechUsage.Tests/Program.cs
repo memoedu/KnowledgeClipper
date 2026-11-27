@@ -31,9 +31,11 @@ Check(StreamingSpeech.SpeechStyle("严谨", settings).Contains("标准普通话"
 Check(StreamingSpeech.SpeechStyle("pain", settings).Contains("American English"), "Short English words receive an explicit pronunciation language");
 Check(StreamingSpeech.SpeechStyle("苹果 apple", settings).Contains("American English"), "Automatic mixed text style follows the actual English spoken text");
 Check(StreamingSpeech.SpeechStyle("苹果 apple", settings with { AutoVoice = false }).Contains("按原文顺序切换语言"), "Manual bilingual speech keeps both languages");
+Check(StreamingSpeech.ProviderForSpokenText("𠀀") == "mimo", "Supplementary Han uses Mandarin synthesis");
 var key = StreamingSpeech.AudioCacheKey("selected", SpeechPurpose.Selection, settings);
 var legacyKey = StreamingSpeech.LegacyAudioCacheKey("selected", SpeechPurpose.Selection, settings);
-Check(key != legacyKey, "New reading instructions do not reuse an unguided synthesis cache entry");
+var guidedKey = StreamingSpeech.GuidedAudioCacheKey("selected", SpeechPurpose.Selection, settings);
+Check(key != legacyKey && key != guidedKey, "Split routing has its own synthesis identity");
 Check(StreamingSpeech.MatchesAudioCacheKey("history-" + legacyKey + ".mp3", "selected", SpeechPurpose.Selection, settings), "Explicit old recording identity remains valid");
 Check(!StreamingSpeech.MatchesAudioCacheKey("history-" + legacyKey + ".mp3", "different", SpeechPurpose.Selection, settings), "Legacy compatibility still rejects different source text");
 Check(key != StreamingSpeech.AudioCacheKey("selected", SpeechPurpose.Sentence, settings), "Purpose isolation");
@@ -75,15 +77,25 @@ using (var speech = new StreamingSpeech(Path.Combine(AppContext.BaseDirectory, "
     await speech.SpeakAsync(mixed, false, () => { });
     Check(mixed.SpeechError == null && File.ReadAllText(mixed.AudioPath!) == "apple pear" && mixed.Original.SelectedText == "苹果 apple 和 pear",
         "Multilingual voice transport receives only English while the captured source stays intact");
-    var legacyDraft = new ClipDraft { Id = Guid.NewGuid().ToString("N") };
-    var legacyPath = Path.Combine(audioRoot, legacyDraft.Id + "-" + legacyKey + ".mp3");
-    File.WriteAllText(legacyPath, "previous recording");
-    await speech.SpeakAsync(legacyDraft, true, () => { });
-    Check(legacyDraft.SpeechError == null && legacyDraft.AudioPath == legacyPath && File.ReadAllText(legacyPath) == "previous recording" &&
-        !legacyDraft.Times.ContainsKey("audioComplete"), "Replay after upgrade plays the original recording without synthesis");
-    await speech.SpeakAsync(legacyDraft, false, () => { });
-    Check(legacyDraft.SpeechError == null && legacyDraft.AudioPath != legacyPath && File.ReadAllText(legacyPath) == "previous recording",
-        "Explicit fresh synthesis uses the new profile and preserves the old recording");
+    await speech.SpeakTextAsync(draft, "自然朗读。", SpeechPurpose.Translation, false, () => { });
+    Check(draft.SpeechError == null && File.ReadAllText(draft.AudioPath!) == "自然朗读。", "Chinese translation uses Mandarin transport");
+    mixed.Settings = settings with { AutoVoice = false };
+    await speech.SpeakAsync(mixed, false, () => { });
+    Check(mixed.SpeechError == null && File.ReadAllText(mixed.AudioPath!) == "苹果 apple 和 pear", "Manual bilingual reading keeps the full text in Mandarin transport");
+    foreach (var oldKey in new[] { legacyKey, guidedKey })
+    {
+        var legacyDraft = new ClipDraft { Id = Guid.NewGuid().ToString("N") };
+        var legacyPath = Path.Combine(audioRoot, legacyDraft.Id + "-" + oldKey + ".mp3");
+        File.WriteAllText(legacyPath, "previous recording");
+        Check(StreamingSpeech.MatchesAudioCacheKey(legacyPath, "selected", SpeechPurpose.Selection, settings),
+            "History accepts the previous recording identity");
+        await speech.SpeakAsync(legacyDraft, true, () => { });
+        Check(legacyDraft.SpeechError == null && legacyDraft.AudioPath == legacyPath && File.ReadAllText(legacyPath) == "previous recording" &&
+            !legacyDraft.Times.ContainsKey("audioComplete"), "Replay after upgrade plays the original recording without synthesis");
+        await speech.SpeakAsync(legacyDraft, false, () => { });
+        Check(legacyDraft.SpeechError == null && legacyDraft.AudioPath != legacyPath && File.ReadAllText(legacyPath) == "previous recording",
+            "Explicit fresh synthesis uses the new profile and preserves the old recording");
+    }
 }
 if (args.Length == 2 && args[0] == "--discover")
 {

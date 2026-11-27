@@ -67,13 +67,13 @@ internal static class AllSettingsChecks
         if (english.Items.Count == 0) Console.WriteLine("LIVE catalog error: " + Find<Label>(dialog, "settings-notice").Text);
         Check(english.Items.Count > 0 && Find<ComboBox>(dialog, "voice").Items.Count > 0, "LIVE available English and Chinese voices load when opening the speech page");
         var oldEnglish = english.Text;
-        var selectedEnglish = english.Items.Cast<SpeechVoiceOption>().First(v => v.Id == "Dean");
+        var selectedEnglish = english.Items.Cast<SpeechVoiceOption>().First(v => v.Id == "cedar");
         english.SelectedItem = selectedEnglish;
         var chinese = Find<ComboBox>(dialog, "voice");
         chinese.SelectedItem = chinese.Items.Cast<SpeechVoiceOption>().First(v => v.Id == "白桦");
         Find<NumericUpDown>(dialog, "rate").Value = 17;
         Find<NumericUpDown>(dialog, "volume").Value = -12;
-        Check(!Find<NumericUpDown>(dialog, "pitch").Enabled && Find<NumericUpDown>(dialog, "pitch").Value == 0, "MiMo fixed pitch cannot be edited");
+        Check(!Find<NumericUpDown>(dialog, "pitch").Enabled && Find<NumericUpDown>(dialog, "pitch").Value == 0, "fixed pitch cannot be edited");
         Check(english.Text != oldEnglish && Find<CheckBox>(dialog, "auto-voice").Checked, "a different real voice can be selected without disabling automatic language routing");
         foreach (var suffix in new[] { "preview-english-voice", "preview-voice" })
         {
@@ -87,7 +87,7 @@ internal static class AllSettingsChecks
             Check(draft.SpeechError == null && draft.Times.ContainsKey("playbackComplete") && File.Exists(draft.AudioPath) && new FileInfo(draft.AudioPath!).Length > 1000,
                 "LIVE " + suffix + " synthesizes and completes playback with the changed voice and parameters");
             Check(draft.Settings.RatePercent == 17 && draft.Settings.VolumePercent == -12 && draft.Settings.PitchHz == 0 &&
-                draft.Settings.Voice == (suffix.Contains("english") ? "Dean" : "白桦"), "preview consumes the current unsaved speech fields for " + suffix);
+                draft.Settings.Voice == (suffix.Contains("english") ? "cedar" : "白桦"), "preview consumes the current unsaved speech fields for " + suffix);
             liveSpeech.Add(new { purpose = suffix, voice = draft.Settings.Voice, draft.AudioPath, draft.Times, draft.SpeechError });
         }
         Check(File.ReadAllText(settingsPath) == beforePreview, "voice discovery and both previews leave saved settings unchanged");
@@ -127,7 +127,7 @@ internal static class AllSettingsChecks
         Check(dialog.IsDisposed, "all valid settings save together through the production Save action");
         var saved = WorkflowJson.Read<LanguageSettings>(settingsPath);
         var savedBytes = File.ReadAllText(settingsPath);
-        Check(saved.Voice == "白桦" && saved.EnglishVoice == "Dean" && saved.RatePercent == 17 && saved.VolumePercent == -12 && saved.PitchHz == 0,
+        Check(saved.Voice == "白桦" && saved.EnglishVoice == "cedar" && saved.RatePercent == 17 && saved.VolumePercent == -12 && saved.PitchHz == 0,
             "changed voices and all speech parameters persist as IDs and numbers");
         Check(saved.AnkiRootDeck == saved.AnkiDeck && saved.AnkiDeck == "Modified settings::Root", "root and compatible deck destination stay synchronized");
         Check(saved.SpeechAutoPlay == false && saved.GlobalSelection && saved.Practice == PracticeChoice.Writing && saved.ContentMaxRetries == 2 && saved.ContentTimeoutSeconds == 7,

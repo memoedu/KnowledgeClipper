@@ -112,25 +112,28 @@ internal sealed class LanguageSettingsForm : Form
         var autoVoice = new CheckBox { Text = "自动选择音色", AutoSize = true, Checked = value.AutoVoice,
             Name = "knowledge-clipper.language.auto-voice", AccessibleName = "knowledge-clipper.language.auto-voice" }; Add("语音", autoVoice);
         Add("", new Label { AutoSize = true, ForeColor = Color.DimGray,
-            Text = "纯中文：朗读全文。\n含英文：使用英文音色并跳过汉字。\n关闭自动：用指定音色朗读全文。" });
+            Text = "中文由 MiMo 朗读，英文由 OpenAI 朗读。\n自动模式下，中英混合文本只读英文。关闭自动后朗读全文。" });
         var voice = new ComboBox { Text = value.Voice, DropDownWidth = 540, Name = "knowledge-clipper.language.voice", AccessibleName = "knowledge-clipper.language.voice" }; Add("中文 / 指定音色", voice);
         var englishVoice = new ComboBox { Text = value.EnglishVoice, DropDownWidth = 540, Name = "knowledge-clipper.language.english-voice", AccessibleName = "knowledge-clipper.language.english-voice" }; Add("英文音色", englishVoice);
         var readVoices = new Button { Text = "读取可用音色", AutoSize = true, Name = "knowledge-clipper.language.read-voices", AccessibleName = "knowledge-clipper.language.read-voices" }; Add("", readVoices);
         var cachedVoices = SpeechVoiceCatalog.ReadCached(value.PythonPath);
         IReadOnlyList<SpeechVoiceOption> availableVoices = cachedVoices?.Voices ?? Array.Empty<SpeechVoiceOption>();
         string VoiceId(ComboBox combo) => combo.SelectedItem is SpeechVoiceOption option && combo.Text == option.ToString() ? option.Id : combo.Text.Trim();
-        void FillVoices(ComboBox combo, IEnumerable<SpeechVoiceOption> options)
+        void FillVoices(ComboBox combo, IEnumerable<SpeechVoiceOption> options, string defaultVoice = null)
         {
-            var selected = SpeechVoiceCatalog.NormalizeVoiceId(VoiceId(combo));
+            var id = VoiceId(combo);
+            var selected = id.StartsWith("openai-", StringComparison.Ordinal) ? id[7..] : SpeechVoiceCatalog.NormalizeVoiceId(id);
             combo.Items.Clear(); combo.Items.AddRange(options.Cast<object>().ToArray());
             var found = combo.Items.Cast<SpeechVoiceOption>().FirstOrDefault(v => v.Id == selected);
+            if (found == null && defaultVoice != null) found = combo.Items.Cast<SpeechVoiceOption>().First(v => v.Id == defaultVoice);
             if (found != null) combo.SelectedItem = found;
             else combo.Text = selected;
         }
         void RefreshVoiceChoices()
         {
-            FillVoices(voice, availableVoices.Where(v => !autoVoice.Checked || v.Id == "Mia" || v.Locale.StartsWith("zh-", StringComparison.OrdinalIgnoreCase)));
-            FillVoices(englishVoice, availableVoices.Where(v => v.Locale.StartsWith("en-", StringComparison.OrdinalIgnoreCase)));
+            FillVoices(voice, autoVoice.Checked ? availableVoices.Where(v => v.Id == "Mia" || v.Locale.StartsWith("zh-", StringComparison.OrdinalIgnoreCase))
+                : availableVoices.Concat(SpeechVoiceCatalog.EnglishVoices));
+            FillVoices(englishVoice, SpeechVoiceCatalog.EnglishVoices, "marin");
         }
         autoVoice.CheckedChanged += (_, _) => RefreshVoiceChoices();
         RefreshVoiceChoices();
@@ -140,7 +143,7 @@ internal sealed class LanguageSettingsForm : Form
         NumericUpDown Number(int n, int min, int max, string id) => new() { Minimum = min, Maximum = max, Value = n, Name = "knowledge-clipper.language." + id };
         var rate = Number(value.RatePercent, -50, 100, "rate"); Add("速度变化 %", rate);
         var volume = Number(value.VolumePercent, -100, 100, "volume"); Add("音量变化 %", volume);
-        var pitch = Number(0, 0, 0, "pitch"); pitch.Enabled = false; Add("MiMo 音高固定", pitch);
+        var pitch = Number(0, 0, 0, "pitch"); pitch.Enabled = false; Add("音高固定", pitch);
         var speechAutoPlay = new CheckBox { Text = "合成后自动播放", AutoSize = true, Checked = value.SpeechAutoPlay, Name = "knowledge-clipper.language.speech-auto-play" }; Add("自动播放", speechAutoPlay);
         Add("", new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "关闭后仍保存音频，可在预览或历史记录中点击播放。试听和句子播放按钮立即播放。" });
         var previewChinese = new Button { Text = "试听中文 / 指定音色", AutoSize = true, Name = "knowledge-clipper.language.preview-voice" };
@@ -360,7 +363,7 @@ internal sealed class LanguageSettingsForm : Form
                 if (requestedPython != python.Text.Trim()) return;
                 availableVoices = discovered; RefreshVoiceChoices();
                 voiceStatus.Text = "已从语音服务读取 " + discovered.Count + " 个音色，列表已缓存。";
-                notice.Text = "已读取可用音色；关闭自动选择后，中文 / 指定音色可选择其他语种。";
+                notice.Text = "已读取 MiMo 音色。英文可选 OpenAI 的 marin 或 cedar。";
             }
             catch (Exception ex) { if (!IsDisposed) voiceStatus.Text = notice.Text = "音色读取未完成，原有列表与选择已保留：" + ex.Message; }
             finally { if (!IsDisposed) readVoices.Enabled = true; }
