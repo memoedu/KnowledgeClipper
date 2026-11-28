@@ -343,7 +343,8 @@ internal sealed partial class LanguageDesktopFlow : IDisposable
                 }
                 var children = LanguageModeCards.Ensure(draft, selected, store);
                 await ReadingCards.Prepare(draft, children, store, content, http, cancellation,
-                    () => { if (form?.IsDisposed == false) form.ContentReady(); }, RefreshMissingModeConfiguration);
+                    () => { if (form?.IsDisposed == false) form.ContentReady(); }, RefreshMissingModeConfiguration,
+                    child => DesktopContentSsh.ForDraft(dataRoot, child));
                 store.Save(draft);
                 if (form?.IsDisposed == false) form.ContentReady();
                 draft.Times["previewReady"] = DateTimeOffset.UtcNow;
@@ -369,7 +370,8 @@ internal sealed partial class LanguageDesktopFlow : IDisposable
                 }
             }
             draft.Content = await content.ProcessAsync(draft.Material, draft.ModeId, draft.Configuration, draft.Settings, cancellation,
-                draft.Input.Intent == "question" ? draft.QuestionText : null);
+                draft.Input.Intent == "question" ? draft.QuestionText : null,
+                draft.Route.OutputKind is "language" or "translation" ? DesktopContentSsh.ForDraft(dataRoot, draft) : null);
             if (draft.Route.OutputKind == "language" && draft.DictionaryDetails == null && draft.ConfirmedNote == null &&
                 draft.Configuration.Modes.FirstOrDefault(mode => mode.Definition.Id == draft.ModeId)?.Definition.Language is { } language)
                 draft.DictionaryDetails = await new DirectDictionaryLookup(http).LookupAsync(draft.Material.SelectedText, language, cancellation);

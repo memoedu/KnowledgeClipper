@@ -421,6 +421,15 @@ export class KnowledgeClipperAdapter {
     if (previousAttempt && previousAttempt.phase !== 'failed_before_cards') {
       throw new Error('Previous export stage is uncertain; inspect recorded IDs before retrying');
     }
+    let pinnedRoot: PluginRem | undefined;
+    if (plan.rootRemId) {
+      try {
+        pinnedRoot = await this.document(plan.rootTitle, null, plan.rootRemId);
+      } catch (error) {
+        return {schemaVersion:KNOWLEDGE_CLIPPER_SCHEMA,sourceId:plan.sourceId,notStarted:true,
+          error:error instanceof Error ? error.message : String(error)};
+      }
+    }
     if (prepareOnly) {
       const error = 'Image preparation is pending; card content has not started';
       await this.plugin.storage.setSynced(attemptKey(plan.sourceId),
@@ -440,7 +449,7 @@ export class KnowledgeClipperAdapter {
     await savePhase('preparing');
     let root: PluginRem, directory: PluginRem;
     try {
-      root = await this.document(plan.rootTitle, null, plan.rootRemId);
+      root = pinnedRoot ?? await this.document(plan.rootTitle, null);
       directory = root;
       for (let i = 0; i < plan.documentPath.length; i++)
         directory = await this.document(plan.documentPath[i]!, directory._id,

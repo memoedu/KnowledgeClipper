@@ -79,6 +79,8 @@ public static class ContentCredentials
     }
 }
 
+public delegate Task<HttpResponseMessage> FrozenContentSender(HttpRequestMessage request, int attempt, CancellationToken cancellationToken);
+
 public sealed partial class ContentModule(HttpClient http, Func<string> key)
 {
     public static bool IsQuestion(string text) => text.TrimEnd().EndsWith('?') || text.TrimEnd().EndsWith('？');
@@ -86,7 +88,7 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
     // One retry location for each necessary request; no recursive retry or reflection pipeline.
     private async Task<T> RequestAsync<T>(LanguageSettings settings, string prompt, object input,
         Func<string, Task<T>> validate, CancellationToken cancellationToken, IReadOnlyList<ImageAsset>? images = null,
-        int maxTokens = 2600, bool disableThinking = false)
+        int maxTokens = 2600, bool disableThinking = false, FrozenContentSender? sender = null)
     {
         Exception? last = null;
         string? rejectedContent = null;
@@ -99,7 +101,8 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
             {
                 var openai = OpenAiTransport.Selected(settings);
                 using var request = new HttpRequestMessage(HttpMethod.Post, settings.ApiBaseUrl.TrimEnd('/') + (openai ? "/responses" : "/chat/completions"));
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", OpenAiTransport.Credential(settings, key));
+                if (sender == null)
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", OpenAiTransport.Credential(settings, key));
                 object userContent = JsonSerializer.Serialize(input, WorkflowJson.Options);
                 if (images is { Count: > 0 })
                 {
@@ -132,7 +135,7 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
                     settings.Model is "gpt-6.2-sol" or "gpt-6.1-sol" ? "high" : "low") : payload);
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(settings.ContentTimeoutSeconds));
-                using var response = await http.SendAsync(request, timeout.Token);
+                using var response = sender == null ? await http.SendAsync(request, timeout.Token) : await sender(request, attempt, timeout.Token);
                 if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
                     throw new UnauthorizedAccessException("内容 API 身份验证失败，请检查安全设置。");
                 if (!response.IsSuccessStatusCode) throw new HttpRequestException("内容 API 请求失败（HTTP " + (int)response.StatusCode + "）。");
@@ -198,7 +201,7 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
     }
 
     public async Task<ContentResult> ProcessAsync(CaptureMaterial material, string modeId, ContentConfiguration config, LanguageSettings settings, CancellationToken ct,
-        string? questionText = null)
+        string? questionText = null, FrozenContentSender? sender = null)
     {
         material.Validate();
         var mode = config.Modes.Single(m => m.Definition.Id == modeId);
@@ -232,7 +235,7 @@ public sealed partial class ContentModule(HttpClient http, Func<string> key)
                 fields = ResolveGeneratedTarget(material, fields);
                 ValidateFields(material, fields);
                 return Task.FromResult(new ContentResult(modeId, fields));
-            }, ct);
+            }, ct, sender: sender);
     }
 
     public async Task<QuestionAnswer> AnswerAsync(CaptureMaterial originalMaterial, ContentResult? initialContent,

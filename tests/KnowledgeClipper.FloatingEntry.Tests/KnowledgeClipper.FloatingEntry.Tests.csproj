@@ -15,5 +15,6 @@
     <Content Include="..\..\modes\**\*" Link="modes\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
     <Content Include="$(DesktopAssemblyDirectory)\chat-view\**\*" Link="chat-view\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(DesktopAssemblyDirectory)\contracts\**\*" Link="contracts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
