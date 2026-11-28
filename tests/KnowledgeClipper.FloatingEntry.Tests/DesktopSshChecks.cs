@@ -7,7 +7,7 @@ internal static partial class Program
 {
     private static T? NoCapturedContext<T>(string text, string granularity) => default;
 
-    private static async Task DesktopSshAsync(Form owner, string sshFixture)
+    private static async Task DesktopSshAsync(Form owner, string sshFixture, bool expectMissingCredential)
     {
         Environment.SetEnvironmentVariable("OPENAI_API_KEY", "isolated-test-fixture-not-a-real-credential");
         Environment.SetEnvironmentVariable("HTTPS_PROXY", "http://127.0.0.1:1");
@@ -70,6 +70,27 @@ internal static partial class Program
         var retry = (Button)form.Controls.Find("knowledge-clipper.language.retry-content", true).Single();
         var confirm = (Button)form.Controls.Find("knowledge-clipper.language.confirm", true).Single();
         ClipDraft? Child() => parent.ModeCards.Count == 1 ? LanguageModeCards.Children(parent, store).Single() : null;
+        if (expectMissingCredential)
+        {
+            bool MissingCredential() => retry.Enabled && Child()?.ContentError?.Contains(
+                "Mac 剪藏未配置 OpenAI 专用凭据。原草稿已保留，Mac 尚未提交本次内容请求。") == true;
+            await Until(MissingCredential, "the real Mac worker reports its missing application credential in the original review", 37000);
+            var unresolved = Child()!;
+            var statePath = Path.Combine(dataRoot, "desktop-content-ssh", unresolved.Id);
+            Check(unresolved.ImportState == ImportState.Unconfirmed && unresolved.Content == null &&
+                Directory.GetFiles(statePath, "*.request.json").Length == 1 &&
+                Directory.GetFiles(statePath, "*.response.json").Length == 0 && !confirm.Enabled && importer.ExportCount == 0,
+                "no content receipt was consumed and the selected draft still cannot export");
+            retry.PerformClick();
+            await Until(MissingCredential, "retrying the same draft returns the same confirmed pre-submission failure", 37000);
+            Check(Child()!.Id == unresolved.Id && parent.Original.SelectedText == "lead" &&
+                Directory.GetFiles(statePath, "*.request.json").Length == 1 &&
+                Directory.GetFiles(statePath, "*.response.json").Length == 0 && importer.ExportCount == 0,
+                "retry preserves one original request identity, no response and no export");
+            Save(form, "missing-credential-review.png");
+            main.Close();
+            return;
+        }
         bool AwaitingReply() => retry.Enabled && Child()?.ContentError?.Contains("Mac 内容结果尚未确认") == true;
         await Until(AwaitingReply, "original review enabled retry after transport failure before the remote claim", 37000);
         var childId = Child()!.Id;

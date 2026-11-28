@@ -20,6 +20,7 @@ internal static partial class Program
     private static Assembly desktop = null!;
     private static bool imageHistoryOnly, quickLanguageOnly, historyReuseOnly, pendingAnkiOnly, meaningReplayOnly;
     private static string? desktopSshFixture;
+    private static bool desktopSshMissingCredential;
     private static object Initial => Type("UserSettings").GetMethod("Defaults", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!;
 
     [STAThread]
@@ -32,7 +33,8 @@ internal static partial class Program
         historyReuseOnly = args.Length == 2 && args[1] == "--history-reuse";
         pendingAnkiOnly = args.Length == 2 && args[1] == "--pending-anki";
         meaningReplayOnly = args.Length == 2 && args[1] == "--meaning-replay";
-        desktopSshFixture = args.Length == 3 && args[1] == "--desktop-content-ssh" ? args[2] : null;
+        desktopSshMissingCredential = args.Length == 3 && args[1] == "--desktop-content-ssh-missing-credential";
+        desktopSshFixture = args.Length == 3 && (args[1] == "--desktop-content-ssh" || desktopSshMissingCredential) ? args[2] : null;
         dataRoot = Path.Combine(@"D:\Caches\KnowledgeClipper\floating-entry-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dataRoot);
         Environment.SetEnvironmentVariable("DEEPSEEK_KNOWLEDGECLIPPER_API_KEY", "isolated-test-fixture-not-a-real-credential");
@@ -58,7 +60,9 @@ internal static partial class Program
                     workflowSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(ClipDraft).Assembly.Location))).ToLowerInvariant(),
                     scope = desktopSshFixture == null
                         ? "Actual desktop flows and preview forms on isolated Windows desktop. Loopback content/import fixtures and deliberately unavailable import endpoints; no real model, speech, clipboard capture or knowledge-base writes."
-                        : "Actual desktop selection flow, original review window and SSH transport. Model on Mac and RemNote SDK on Windows use controlled fixtures."
+                        : desktopSshMissingCredential
+                            ? "Actual desktop selection flow, original review and unmodified Mac worker over SSH, without a configured application credential."
+                            : "Actual desktop selection flow, original review window and SSH transport. Model on Mac and RemNote SDK on Windows use controlled fixtures."
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 context.ExitThread();
             }
@@ -69,7 +73,7 @@ internal static partial class Program
     private static async Task RunAsync()
     {
         using var owner = new Form(); _ = owner.Handle;
-        if (desktopSshFixture != null) { await DesktopSshAsync(owner, desktopSshFixture); return; }
+        if (desktopSshFixture != null) { await DesktopSshAsync(owner, desktopSshFixture, desktopSshMissingCredential); return; }
         if (Environment.GetCommandLineArgs().Contains("--quick-feedback")) { await QuickFeedbackAsync(owner); return; }
         if (meaningReplayOnly) { await MeaningReplayAsync(owner); return; }
         if (pendingAnkiOnly) { await PendingAnkiAsync(owner); return; }

@@ -10,6 +10,7 @@ public static class DesktopContentSsh
 {
     private sealed record Binding(string Host, string RemotePython, string RemoteHelper, string RemoteConfig, string Authority);
     private sealed class OutcomeUnknown() : Exception("Mac 内容结果尚未确认。请保留原草稿并重试同一请求，Mac 会防止重复提交。");
+    private sealed class CredentialMissing(string provider) : Exception($"Mac 剪藏未配置 {provider} 专用凭据。原草稿已保留，Mac 尚未提交本次内容请求。");
     private const int Limit = 4 * 1024 * 1024;
     private const string RequestSuffix = ".request.json";
     private const string ResponseSuffix = ".response.json";
@@ -77,6 +78,8 @@ public static class DesktopContentSsh
             await process.WaitForExitAsync(ct).ConfigureAwait(false);
             var received = await output.ConfigureAwait(false);
             await error.ConfigureAwait(false);
+            if (process.ExitCode == 78 && received.Length == 0)
+                throw new CredentialMissing(endpoint == "openai-responses" ? "OpenAI" : "DeepSeek");
             if (process.ExitCode != 0) throw new OutcomeUnknown();
             var response = Response(received, identity);
             PublishOnce(result, received);
